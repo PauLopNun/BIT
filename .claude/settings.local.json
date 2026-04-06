@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(file:*)",
+      "Bash(python3 -c \"import PIL; print\\('ok'\\)\")",
+      "Bash(python -c ':*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -v \"m_Name: $\")",
+      "Bash(ls -d '/c/UnityProjects/BIT/Assets/_Project/Sprites/Ninja Adventure/weapon'/*)",
+      "Bash(python3 -c ':*)",
+      "Bash(ls C:/UnityProjects/BIT/*.md)",
+      "Bash(gh --version)",
+      "Bash(git init:*)",
+      "Bash(git config:*)",
+      "Bash(git rm:*)"
+    ]
+  }
+}
