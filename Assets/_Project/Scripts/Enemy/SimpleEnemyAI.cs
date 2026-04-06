@@ -1,0 +1,325 @@
+using UnityEngine;
+
+// ============================================================================
+// SIMPLEENEMYAI.CS - IA simplificada de enemigo
+// ============================================================================
+// Sistema de IA que persigue al jugador automáticamente sin necesidad de
+// configurar waypoints o layers en el Inspector. Ideal para prototipos.
+//
+// El enemigo:
+// - Busca al jugador por tag "Player"
+// - Lo persigue cuando está en rango de detección
+// - Le hace daño por contacto
+// - Puede recibir daño y morir
+// ============================================================================
+
+namespace BIT.Core
+{
+    [RequireComponent(typeof(Rigidbody2D))]
+    [RequireComponent(typeof(Collider2D))]
+    public class SimpleEnemyAI : MonoBehaviour
+    {
+        // ====================================================================
+        // CONFIGURACIÓN
+        // ====================================================================
+
+        [Header("=== MOVIMIENTO ===")]
+        [Tooltip("Velocidad de movimiento")]
+        public float moveSpeed = 2f;
+
+        [Tooltip("Rango de detección del jugador")]
+        public float detectionRange = 8f;
+
+        [Tooltip("Distancia mínima al jugador (para no pegarse)")]
+        public float stoppingDistance = 0.8f;
+
+        [Header("=== COMBATE ===")]
+        [Tooltip("Daño que hace al jugador por contacto")]
+        public int damage = 10;
+
+        [Tooltip("Cooldown entre ataques (segundos)")]
+        public float attackCooldown = 1f;
+
+        [Tooltip("Vida máxima del enemigo")]
+        public int maxHealth = 50;
+
+        [Header("=== PUNTUACIÓN ===")]
+        [Tooltip("Puntos que da al morir")]
+        public int scoreValue = 100;
+
+        // ====================================================================
+        // VARIABLES PRIVADAS
+        // ====================================================================
+
+        private Transform _player;
+        private Rigidbody2D _rb;
+        private Animator _animator;
+        private SpriteRenderer _spriteRenderer;
+        private int _currentHealth;
+        private float _lastAttackTime;
+        private Vector2 _moveDirection;
+        private bool _isDead = false;
+
+        // Hash de parámetros del animator para optimización
+        private static readonly int ANIM_SPEED = Animator.StringToHash("Speed");
+        private static readonly int ANIM_MOVEX = Animator.StringToHash("MoveX");
+        private static readonly int ANIM_MOVEY = Animator.StringToHash("MoveY");
+
+        // ====================================================================
+        // INICIALIZACIÓN
+        // ====================================================================
+
+        void Awake()
+        {
+            _rb = GetComponent<Rigidbody2D>();
+            _animator = GetComponent<Animator>();
+            _spriteRenderer = GetComponent<SpriteRenderer>();
+
+            // Configurar Rigidbody
+            _rb.gravityScale = 0f;
+            _rb.freezeRotation = true;
+            _rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        }
+
+        void Start()
+        {
+            _currentHealth = maxHealth;
+            FindPlayer();
+
+            // El RuntimeGameManager cuenta enemigos automáticamente en CountEnemies()
+            // No necesitamos registrar manualmente
+        }
+
+        void FindPlayer()
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                _player = playerObj.transform;
+            }
+            else
+            {
+                Debug.LogWarning($"[SimpleEnemyAI] {gameObject.name}: No se encontró jugador con tag 'Player'");
+            }
+        }
+
+        // ====================================================================
+        // UPDATE - Animaciones
+        // ====================================================================
+
+        void Update()
+        {
+            if (_isDead) return;
+
+            // Si perdimos la referencia al jugador, intentar encontrarlo
+            if (_player == null)
+            {
+                FindPlayer();
+                return;
+            }
+
+            // Actualizar animaciones
+            UpdateAnimations();
+        }
+
+        void UpdateAnimations()
+        {
+            if (_animator == null) return;
+
+            float speed = _rb.linearVelocity.magnitude;
+
+            // Intentamos setear los parámetros (algunos animators pueden no tenerlos)
+            try
+            {
+                _animator.SetFloat(ANIM_SPEED, speed);
+
+                if (_moveDirection.magnitude > 0.1f)
+                {
+                    _animator.SetFloat(ANIM_MOVEX, _moveDirection.x);
+                    _animator.SetFloat(ANIM_MOVEY, _moveDirection.y);
+                }
+            }
+            catch { }
+
+            // Voltear sprite según dirección
+            if (_spriteRenderer != null && Mathf.Abs(_moveDirection.x) > 0.1f)
+            {
+                _spriteRenderer.flipX = _moveDirection.x < 0;
+            }
+        }
+
+        // ====================================================================
+        // FIXED UPDATE - Movimiento con Físicas
+        // ====================================================================
+
+        void FixedUpdate()
+        {
+            if (_isDead || _player == null) return;
+
+            float distance = Vector2.Distance(transform.position, _player.position);
+
+            // Si el jugador está en rango de detección y no demasiado cerca
+            if (distance < detectionRange && distance > stoppingDistance)
+            {
+                // Calcular dirección hacia el jugador
+                _moveDirection = ((Vector2)_player.position - (Vector2)transform.position).normalized;
+
+                // Moverse hacia el jugador
+                _rb.linearVelocity = _moveDirection * moveSpeed;
+            }
+            else
+            {
+                // Fuera de rango o demasiado cerca - detenerse
+                _rb.linearVelocity = Vector2.zero;
+                _moveDirection = Vector2.zero;
+            }
+
+            // Daño por proximidad: si el jugador está muy cerca aunque no haya colisión física
+            if (distance < stoppingDistance + 0.4f)
+            {
+                TryDamagePlayer(_player.gameObject);
+            }
+        }
+
+        // ====================================================================
+        // COLISIONES - Daño al jugador
+        // ====================================================================
+
+        void OnCollisionEnter2D(Collision2D collision)
+        {
+            TryDamagePlayer(collision.gameObject);
+        }
+
+        void OnCollisionStay2D(Collision2D collision)
+        {
+            TryDamagePlayer(collision.gameObject);
+        }
+
+        void TryDamagePlayer(GameObject other)
+        {
+            if (_isDead) return;
+
+            if (other.CompareTag("Player"))
+            {
+                // Verificar cooldown de ataque
+                if (Time.time - _lastAttackTime >= attackCooldown)
+                {
+                    _lastAttackTime = Time.time;
+
+                    // Hacer daño al jugador
+                    var playerController = other.GetComponent<BIT.Player.PlayerController>();
+                    if (playerController != null)
+                    {
+                        playerController.TakeDamage(damage);
+                        Debug.Log($"[SimpleEnemyAI] {gameObject.name} hizo {damage} de daño al jugador");
+                    }
+                }
+            }
+        }
+
+        // ====================================================================
+        // RECIBIR DAÑO
+        // ====================================================================
+
+        /// <summary>
+        /// El enemigo recibe daño (llamado desde proyectiles o ataque melee)
+        /// </summary>
+        public void TakeDamage(int amount)
+        {
+            if (_isDead) return;
+
+            _currentHealth -= amount;
+            Debug.Log($"[SimpleEnemyAI] {gameObject.name} recibió {amount} de daño. Vida: {_currentHealth}/{maxHealth}");
+
+            // Efecto visual de daño
+            StartCoroutine(DamageFlash());
+
+            // Efecto VFX
+            if (VFXManager.Instance != null)
+            {
+                VFXManager.Instance.SpawnHitEffect(transform.position);
+            }
+
+            // Verificar muerte
+            if (_currentHealth <= 0)
+            {
+                Die();
+            }
+        }
+
+        System.Collections.IEnumerator DamageFlash()
+        {
+            if (_spriteRenderer == null) yield break;
+
+            Color originalColor = _spriteRenderer.color;
+            _spriteRenderer.color = Color.red;
+            yield return new WaitForSeconds(0.1f);
+
+            if (_spriteRenderer != null)
+                _spriteRenderer.color = originalColor;
+        }
+
+        // ====================================================================
+        // MUERTE
+        // ====================================================================
+
+        void Die()
+        {
+            if (_isDead) return;
+            _isDead = true;
+
+            Debug.Log($"[SimpleEnemyAI] {gameObject.name} ha muerto!");
+
+            // Dar puntos al jugador
+            if (_player != null)
+            {
+                var playerController = _player.GetComponent<BIT.Player.PlayerController>();
+                if (playerController != null)
+                {
+                    playerController.AddScore(scoreValue);
+                }
+            }
+
+            // Notificar al RuntimeGameManager
+            if (RuntimeGameManager.Instance != null)
+            {
+                RuntimeGameManager.Instance.PlayEnemyDeathSound();
+                RuntimeGameManager.Instance.OnEnemyKilled();
+            }
+
+            // Efecto de muerte
+            if (VFXManager.Instance != null)
+            {
+                VFXManager.Instance.SpawnDeathEffect(transform.position);
+            }
+
+            // Notificar al WaveManager
+            WaveManager.Instance?.NotifyEnemyDied(gameObject);
+
+            // Desactivar colisiones
+            var col = GetComponent<Collider2D>();
+            if (col != null) col.enabled = false;
+
+            // Detener movimiento
+            _rb.linearVelocity = Vector2.zero;
+
+            // Destruir después de un momento
+            Destroy(gameObject, 0.5f);
+        }
+
+        // ====================================================================
+        // GIZMOS
+        // ====================================================================
+
+        void OnDrawGizmosSelected()
+        {
+            // Rango de detección (amarillo)
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireSphere(transform.position, detectionRange);
+
+            // Distancia de parada (rojo)
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(transform.position, stoppingDistance);
+        }
+    }
+}

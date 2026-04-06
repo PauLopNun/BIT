@@ -1,0 +1,77 @@
+# ===========================
+# Unity generated folders
+# ===========================
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+MemoryCaptures/
+
+# Asset meta data should only be ignored when not shipped
+# *.meta
+
+# Unity3D generated meta files
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Unity3D generated file on crash reports
+sysinfo.txt
+
+# Builds
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Crashlytics generated file
+crashlytics-build.properties
+
+# ===========================
+# Visual Studio / Rider
+# ===========================
+.vs/
+*.sln
+*.csproj
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ===========================
+# OS generated files
+# ===========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ===========================
+# Visual Studio config (auto-generated)
+# ===========================
+.vsconfig
+
+# ===========================
+# Windows null device artifact
+# ===========================
+nul
+
+# ===========================
+# Dev notes (local only)
+# ===========================
+CONFIGURACION_UNITY.md
+GUIA_COMPLETA_PASO_A_PASO.md
+GUIA_MAPA.md
+GUIA_RAPIDA.md
+QUE_FALTA.md
+QUE_FALTA_AHORA.md
+SETUP_ASSETS.md
+CLAUDE.md
