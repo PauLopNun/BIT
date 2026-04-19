@@ -488,19 +488,25 @@ namespace BIT.Enemy
             // Notificamos al WaveManager antes de destruirnos
             BIT.Core.WaveManager.Instance?.NotifyEnemyDied(gameObject);
 
-            // Puntuación por matar al enemigo
-            int scoreReward = 50 + (_maxHealth / 2);
-            // Buscamos PlayerStats a través del GameManager
-            GameManager.Instance?.GetPlayerStats()?.AddScore(scoreReward);
+            // Score con multiplicador de combo
+            int baseScore = 50 + (_maxHealth / 2);
+            int finalScore = BIT.Core.ComboManager.Instance != null
+                ? BIT.Core.ComboManager.Instance.RegisterKill(baseScore)
+                : baseScore;
+
+            // Sumamos puntos al jugador
+            var player = FindFirstObjectByType<PlayerController>();
+            player?.AddScore(finalScore);
+
+            // Drop de items aleatorio
+            GetComponent<EnemyDropper>()?.Drop();
 
             // Animación de muerte
             _animator?.SetTrigger(ANIM_DIE);
 
-            // Deshabilitamos componentes
             _rb.linearVelocity = Vector2.zero;
             GetComponent<Collider2D>().enabled = false;
 
-            // Destruimos después de la animación
             Destroy(gameObject, 1f);
         }
 
@@ -617,19 +623,22 @@ namespace BIT.Enemy
         // SECCIÓN 13: PROPIEDADES PÚBLICAS
         // ====================================================================
 
-        /// <summary>
-        /// Estado actual del enemigo (solo lectura).
-        /// </summary>
         public EnemyState CurrentState => _currentState;
-
-        /// <summary>
-        /// Vida actual del enemigo.
-        /// </summary>
         public int CurrentHealth => _currentHealth;
-
-        /// <summary>
-        /// Vida máxima del enemigo.
-        /// </summary>
         public int MaxHealth => _maxHealth;
+
+        // ====================================================================
+        // SECCIÓN 14: ESCALADO (llamado desde WaveManager)
+        // ====================================================================
+
+        public void ScaleStats(float factor)
+        {
+            _maxHealth = Mathf.RoundToInt(_maxHealth * factor);
+            _currentHealth = _maxHealth;
+            _attackDamage = Mathf.RoundToInt(_attackDamage * factor);
+            // Escalar velocidad suavemente para no hacer enemigos imposibles
+            _chaseSpeed = Mathf.Min(_chaseSpeed * (1f + (factor - 1f) * 0.4f), 10f);
+            _patrolSpeed = Mathf.Min(_patrolSpeed * (1f + (factor - 1f) * 0.25f), 5f);
+        }
     }
 }

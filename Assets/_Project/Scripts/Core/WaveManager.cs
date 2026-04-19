@@ -45,6 +45,13 @@ namespace BIT.Core
         [Tooltip("Enemigo fuerte (disponible desde ronda 5)")]
         [SerializeField] private GameObject _tankEnemyPrefab;
 
+        [Header("=== BOSS ===")]
+        [Tooltip("Prefab del boss (si está vacío se usa el enemigo fuerte con stats escalados x8)")]
+        [SerializeField] private GameObject _bossPrefab;
+
+        [Tooltip("Cada cuántas rondas aparece el boss")]
+        [SerializeField] private int _bossEveryNWaves = 10;
+
         [Header("=== DIFICULTAD ===")]
         [Tooltip("Enemigos en la primera oleada")]
         [SerializeField] private int _baseEnemyCount = 3;
@@ -180,27 +187,75 @@ namespace BIT.Core
         /// <summary>Corrutina que spawna todos los enemigos de la oleada.</summary>
         private IEnumerator SpawnWave()
         {
-            int enemiesToSpawn = CalculateEnemyCount();
-            Debug.Log($"[WaveManager] Spawneando {enemiesToSpawn} enemigos");
-
             _activeEnemies.Clear();
 
-            for (int i = 0; i < enemiesToSpawn; i++)
+            bool isBossWave = _bossEveryNWaves > 0 && _currentWave % _bossEveryNWaves == 0;
+
+            if (isBossWave)
             {
-                if (GameManager.Instance != null && !GameManager.Instance.IsPlaying)
-                    yield break;
+                yield return StartCoroutine(SpawnBossWave());
+            }
+            else
+            {
+                int enemiesToSpawn = CalculateEnemyCount();
+                Debug.Log($"[WaveManager] Spawneando {enemiesToSpawn} enemigos");
 
-                GameObject enemy = SpawnEnemy();
-                if (enemy != null)
-                    _activeEnemies.Add(enemy);
+                for (int i = 0; i < enemiesToSpawn; i++)
+                {
+                    if (GameManager.Instance != null && !GameManager.Instance.IsPlaying)
+                        yield break;
 
-                OnEnemyCountChanged?.Invoke(CountAliveEnemies());
+                    GameObject enemy = SpawnEnemy();
+                    if (enemy != null)
+                        _activeEnemies.Add(enemy);
 
-                yield return new WaitForSeconds(_timeBetweenSpawns);
+                    OnEnemyCountChanged?.Invoke(CountAliveEnemies());
+
+                    yield return new WaitForSeconds(_timeBetweenSpawns);
+                }
             }
 
-            // Esperamos a que mueran todos
             yield return StartCoroutine(WaitForWaveClear());
+        }
+
+        /// <summary>Spawna la oleada del boss.</summary>
+        private IEnumerator SpawnBossWave()
+        {
+            Debug.Log($"[WaveManager] ¡¡OLEADA DE BOSS!! Ronda {_currentWave}");
+
+            UIManager.Instance?.ShowWaveMessage($"¡¡OLEADA JEFE!! RONDA {_currentWave}", isStart: true);
+            RuntimeGameManager.Instance?.ShowBigMessage("¡¡BOSS INCOMING!!", Color.red);
+
+            yield return new WaitForSeconds(1.5f);
+
+            // Usar _bossPrefab si está asignado; si no, usar _tankEnemyPrefab con stats x8
+            GameObject bossPrefab = _bossPrefab != null ? _bossPrefab : _tankEnemyPrefab;
+            if (bossPrefab == null) bossPrefab = _basicEnemyPrefab;
+            if (bossPrefab == null)
+            {
+                Debug.LogError("[WaveManager] No hay prefab de boss ni de enemigos asignado.");
+                yield break;
+            }
+
+            Vector3 spawnPos = GetSpawnPosition();
+            GameObject boss = Instantiate(bossPrefab, spawnPos, Quaternion.identity);
+
+            // Si tiene BossEnemyAI, aplicar escalado de boss
+            var bossAI = boss.GetComponent<BossEnemyAI>();
+            if (bossAI != null)
+            {
+                float bossScale = 1f + (_currentWave / _bossEveryNWaves - 1) * 0.5f;
+                bossAI.ScaleStats(Mathf.Max(1f, bossScale));
+            }
+            else
+            {
+                // Sin BossEnemyAI: escalar el enemigo normal x8 para que actúe de boss
+                ScaleEnemyStats(boss, 8f);
+                boss.transform.localScale = Vector3.one * 1.8f;
+            }
+
+            _activeEnemies.Add(boss);
+            OnEnemyCountChanged?.Invoke(CountAliveEnemies());
         }
 
         /// <summary>Espera hasta que no queden enemigos vivos.</summary>
@@ -254,8 +309,9 @@ namespace BIT.Core
         {
             int count = _baseEnemyCount + (_currentWave - 1) * _enemiesPerRoundIncrease;
 
-            // Oleadas de horda: el doble de enemigos
-            if (_currentWave % _hordeEveryNWaves == 0)
+            // Las oleadas de boss tienen prioridad — no son horda
+            bool isBossWave = _bossEveryNWaves > 0 && _currentWave % _bossEveryNWaves == 0;
+            if (!isBossWave && _currentWave % _hordeEveryNWaves == 0)
             {
                 count *= 2;
                 Debug.Log($"[WaveManager] ¡OLEADA HORDA! Enemigos: {count}");
@@ -325,15 +381,20 @@ namespace BIT.Core
         private void ScaleEnemyStats(GameObject enemy)
         {
             if (_currentWave <= 1) return;
-
-            EnemyAI ai = enemy.GetComponent<EnemyAI>();
-            SimpleEnemyAI simpleAI = enemy.GetComponent<SimpleEnemyAI>();
-
             float scaleFactor = 1f + (_currentWave - 1) * 0.15f; // +15% por ronda
+            ScaleEnemyStats(enemy, scaleFactor);
+        }
 
-            // Los scripts de enemigo exponen sus stats públicamente
-            // por ahora solo escalamos a través del componente si tiene el método
-            // (escalado real se haría con un método público en EnemyAI)
+        private void ScaleEnemyStats(GameObject enemy, float scaleFactor)
+        {
+            var ai = enemy.GetComponent<EnemyAI>();
+            if (ai != null) { ai.ScaleStats(scaleFactor); return; }
+
+            var simpleAI = enemy.GetComponent<SimpleEnemyAI>();
+            if (simpleAI != null) { simpleAI.ScaleStats(scaleFactor); return; }
+
+            var bossAI = enemy.GetComponent<BossEnemyAI>();
+            if (bossAI != null) bossAI.ScaleStats(scaleFactor);
         }
 
         /// <summary>Obtiene una posición de spawn válida (alejada del jugador).</summary>
@@ -390,12 +451,24 @@ namespace BIT.Core
             Debug.Log($"[WaveManager] Enemigo muerto. Quedan: {CountAliveEnemies()}");
         }
 
+        /// <summary>
+        /// Registra un minion invocado por el boss en la lista de enemigos activos.
+        /// Así la oleada no termina hasta que también muera el minion.
+        /// </summary>
+        public void RegisterBossMinion(GameObject minion)
+        {
+            if (minion != null && !_activeEnemies.Contains(minion))
+            {
+                _activeEnemies.Add(minion);
+                OnEnemyCountChanged?.Invoke(CountAliveEnemies());
+            }
+        }
+
         /// <summary>Fuerza el inicio de la siguiente oleada (útil para debug).</summary>
         [ContextMenu("Forzar siguiente oleada")]
         public void ForceNextWave()
         {
             StopAllCoroutines();
-            // Destruir enemigos actuales
             foreach (var e in _activeEnemies)
                 if (e != null) Destroy(e);
             _activeEnemies.Clear();
