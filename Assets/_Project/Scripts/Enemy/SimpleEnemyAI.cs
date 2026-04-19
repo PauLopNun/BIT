@@ -270,41 +270,39 @@ namespace BIT.Core
 
             Debug.Log($"[SimpleEnemyAI] {gameObject.name} ha muerto!");
 
-            // Dar puntos al jugador
+            // Score con multiplicador de combo
+            int finalScore = ComboManager.Instance != null
+                ? ComboManager.Instance.RegisterKill(scoreValue)
+                : scoreValue;
+
             if (_player != null)
-            {
-                var playerController = _player.GetComponent<BIT.Player.PlayerController>();
-                if (playerController != null)
-                {
-                    playerController.AddScore(scoreValue);
-                }
-            }
+                _player.GetComponent<BIT.Player.PlayerController>()?.AddScore(finalScore);
 
-            // Notificar al RuntimeGameManager
-            if (RuntimeGameManager.Instance != null)
-            {
-                RuntimeGameManager.Instance.PlayEnemyDeathSound();
-                RuntimeGameManager.Instance.OnEnemyKilled();
-            }
+            // Drop de items al morir
+            GetComponent<BIT.Enemy.EnemyDropper>()?.Drop();
 
-            // Efecto de muerte
-            if (VFXManager.Instance != null)
-            {
-                VFXManager.Instance.SpawnDeathEffect(transform.position);
-            }
-
-            // Notificar al WaveManager
+            RuntimeGameManager.Instance?.PlayEnemyDeathSound();
+            RuntimeGameManager.Instance?.OnEnemyKilled();
+            VFXManager.Instance?.SpawnDeathEffect(transform.position);
             WaveManager.Instance?.NotifyEnemyDied(gameObject);
 
-            // Desactivar colisiones
             var col = GetComponent<Collider2D>();
             if (col != null) col.enabled = false;
-
-            // Detener movimiento
             _rb.linearVelocity = Vector2.zero;
 
-            // Destruir después de un momento
             Destroy(gameObject, 0.5f);
+        }
+
+        // ====================================================================
+        // ESCALADO (llamado desde WaveManager)
+        // ====================================================================
+
+        public void ScaleStats(float factor)
+        {
+            maxHealth = Mathf.RoundToInt(maxHealth * factor);
+            _currentHealth = maxHealth;
+            damage = Mathf.RoundToInt(damage * factor);
+            moveSpeed = Mathf.Min(moveSpeed * (1f + (factor - 1f) * 0.35f), 8f);
         }
 
         // ====================================================================

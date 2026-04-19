@@ -737,6 +737,66 @@ namespace BIT.Core
         }
 
         // ====================================================================
+        // BIG MESSAGE (nivel, boss, upgrade)
+        // ====================================================================
+
+        private Text _bigMessageText;
+        private GameObject _bigMessageGO;
+        private Coroutine _bigMessageCoroutine;
+
+        // Lazy-create the big message element and show it
+        public void ShowBigMessage(string msg, Color color)
+        {
+            EnsureBigMessage();
+            if (_bigMessageGO == null) return;
+
+            _bigMessageText.text = msg;
+            _bigMessageText.color = color;
+            _bigMessageGO.SetActive(true);
+
+            if (_bigMessageCoroutine != null) StopCoroutine(_bigMessageCoroutine);
+            _bigMessageCoroutine = StartCoroutine(HideBigMessageDelay());
+        }
+
+        void EnsureBigMessage()
+        {
+            if (_bigMessageGO != null) return;
+            if (_canvas == null) return;
+
+            _bigMessageGO = new GameObject("BigMessage");
+            _bigMessageGO.transform.SetParent(_canvas.transform, false);
+
+            _bigMessageText = _bigMessageGO.AddComponent<Text>();
+            _bigMessageText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _bigMessageText.fontSize = 58;
+            _bigMessageText.fontStyle = FontStyle.Bold;
+            _bigMessageText.alignment = TextAnchor.MiddleCenter;
+            _bigMessageText.color = Color.white;
+
+            Outline outline = _bigMessageGO.AddComponent<Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(4, -4);
+
+            Shadow shadow = _bigMessageGO.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0, 0, 0, 0.6f);
+            shadow.effectDistance = new Vector2(5, -5);
+
+            RectTransform rt = _bigMessageGO.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 0.35f);
+            rt.anchorMax = new Vector2(1f, 0.65f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            _bigMessageGO.SetActive(false);
+        }
+
+        IEnumerator HideBigMessageDelay()
+        {
+            yield return new WaitForSeconds(2.8f);
+            if (_bigMessageGO != null) _bigMessageGO.SetActive(false);
+        }
+
+        // ====================================================================
         // GETTERS
         // ====================================================================
 
