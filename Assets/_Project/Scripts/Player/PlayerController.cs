@@ -67,6 +67,16 @@ namespace BIT.Player
         [Tooltip("Puntuación")]
         public int score = 0;
 
+        [Header("=== DASH (segundo ataque) ===")]
+        [Tooltip("Velocidad durante el dash")]
+        public float dashSpeed = 18f;
+
+        [Tooltip("Duración del dash en segundos")]
+        public float dashDuration = 0.18f;
+
+        [Tooltip("Cooldown del dash (segundos)")]
+        public float dashCooldown = 3f;
+
         // ====================================================================
         // COMPONENTES (se obtienen automáticamente)
         // ====================================================================
@@ -171,6 +181,9 @@ namespace BIT.Player
             }
 
             Debug.Log("[Player] Jugador inicializado con New Input System. Vida: " + currentHealth);
+
+            // Aplicar stats del personaje seleccionado en la pantalla de selección
+            ApplyCharacterData();
         }
 
         // ====================================================================
@@ -211,6 +224,17 @@ namespace BIT.Player
             // VOLTEAR SPRITE SEGÚN DIRECCIÓN
             // --------------------------------------------------------
             UpdateSpriteDirection();
+
+            // --------------------------------------------------------
+            // DASH ATTACK — Shift o botón secundario
+            // --------------------------------------------------------
+            if (_dashCooldownTimer > 0f) _dashCooldownTimer -= Time.deltaTime;
+
+            bool dashInput = (Keyboard.current != null && Keyboard.current.shiftKey.wasPressedThisFrame)
+                          || (Mouse.current   != null && Mouse.current.rightButton.wasPressedThisFrame);
+
+            if (!_isDashing && _dashCooldownTimer <= 0f && canMove && dashInput)
+                StartCoroutine(DashAttack());
         }
 
         // ====================================================================
@@ -515,6 +539,10 @@ namespace BIT.Player
         private float baseSpeed;
         private Coroutine speedCoroutine;
 
+        // Dash state
+        private bool _isDashing;
+        private float _dashCooldownTimer;
+
         /// <summary>
         /// Modifica la velocidad temporalmente (power-up o trampa de lentitud)
         /// </summary>
@@ -552,6 +580,101 @@ namespace BIT.Player
             score -= points;
             if (score < 0) score = 0;
             Debug.Log("[Player] -" + points + " puntos. Total: " + score);
+        }
+
+        // ====================================================================
+        // DASH ATTACK — segundo tipo de ataque
+        // ====================================================================
+        // Shift / Clic derecho: dash en la dirección de movimiento.
+        // Durante el dash el jugador es invulnerable y daña al doble.
+        // Cooldown: 3 segundos (configurable por personaje).
+
+        System.Collections.IEnumerator DashAttack()
+        {
+            _isDashing = true;
+            _dashCooldownTimer = dashCooldown;
+            canMove = false;
+
+            // Dirección: movimiento actual o última dirección guardada
+            Vector2 dir = moveInput.sqrMagnitude > 0.1f ? moveInput.normalized : lastMoveDirection;
+
+            // Flash cian para marcar el dash visualmente
+            if (spriteRenderer != null) spriteRenderer.color = new Color(0.3f, 0.9f, 1f, 0.85f);
+
+            // Sonido (reutiliza el de ataque; diferente pitch)
+            if (BIT.Core.RuntimeGameManager.Instance != null)
+                BIT.Core.RuntimeGameManager.Instance.PlayAttackSound();
+
+            float elapsed = 0f;
+            while (elapsed < dashDuration)
+            {
+                rb.linearVelocity = dir * dashSpeed;
+
+                // Golpear enemigos en el área del dash
+                var hits = Physics2D.OverlapCircleAll(transform.position, 0.7f);
+                foreach (var hit in hits)
+                {
+                    if (!hit.CompareTag("Enemy")) continue;
+                    int dashDmg = meleeDamage * 2;
+                    var simpleAI = hit.GetComponent<BIT.Core.SimpleEnemyAI>();
+                    if (simpleAI != null) { simpleAI.TakeDamage(dashDmg); continue; }
+                    var enemyAI = hit.GetComponent<BIT.Enemy.EnemyAI>();
+                    if (enemyAI != null) { enemyAI.TakeDamage(dashDmg); continue; }
+                    var bossAI = hit.GetComponent<BIT.Enemy.BossEnemyAI>();
+                    if (bossAI != null) bossAI.TakeDamage(dashDmg);
+                }
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            rb.linearVelocity = Vector2.zero;
+
+            // Restaurar color del sprite
+            if (spriteRenderer != null)
+            {
+                var csm = BIT.Core.CharacterSelectManager.Instance;
+                spriteRenderer.color = csm?.SelectedCharacter != null
+                    ? csm.SelectedCharacter.spriteColor
+                    : Color.white;
+            }
+
+            // VFX del dash
+            if (BIT.Core.VFXManager.Instance != null)
+                BIT.Core.VFXManager.Instance.SpawnSlash(transform.position, dir);
+
+            _isDashing = false;
+            canMove = true;
+        }
+
+        // ====================================================================
+        // APLICAR DATOS DEL PERSONAJE SELECCIONADO
+        // ====================================================================
+
+        void ApplyCharacterData()
+        {
+            var csm = BIT.Core.CharacterSelectManager.Instance;
+            if (csm?.SelectedCharacter == null) return;
+
+            var data = csm.SelectedCharacter;
+            maxHealth       = data.maxHealth;
+            currentHealth   = data.maxHealth;
+            moveSpeed       = data.moveSpeed;
+            meleeDamage     = data.meleeDamage;
+            attackCooldown  = data.attackCooldown;
+            meleeRange      = data.meleeRange;
+            dashSpeed       = data.dashSpeed;
+            dashDuration    = data.dashDuration;
+            dashCooldown    = data.dashCooldown;
+
+            if (spriteRenderer != null)
+                spriteRenderer.color = data.spriteColor;
+
+            // Actualizar UI con la nueva vida máxima
+            if (BIT.Core.RuntimeGameManager.Instance != null)
+                BIT.Core.RuntimeGameManager.Instance.SetHealth(currentHealth, maxHealth);
+
+            Debug.Log($"[Player] Personaje aplicado: {data.characterName} — HP:{maxHealth} SPD:{moveSpeed} DMG:{meleeDamage}");
         }
     }
 }
