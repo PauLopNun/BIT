@@ -99,6 +99,7 @@ namespace BIT.Player
         private Vector2 lastMoveDirection = Vector2.down;
         private float lastAttackTime;
         private bool canMove = true;
+        private bool _isDead = false;
 
         // ====================================================================
         // INICIALIZACIÓN
@@ -430,6 +431,8 @@ namespace BIT.Player
         /// </summary>
         public void TakeDamage(int damage)
         {
+            if (_isDead) return;
+
             currentHealth -= damage;
             Debug.Log("[Player] Daño recibido: " + damage + ". Vida: " + currentHealth);
 
@@ -493,6 +496,7 @@ namespace BIT.Player
 
         void Die()
         {
+            _isDead = true;
             Debug.Log("[Player] ¡Game Over!");
             canMove = false;
             rb.linearVelocity = Vector2.zero;
