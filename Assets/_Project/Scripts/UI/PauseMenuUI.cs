@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 using TMPro;
 using BIT.Core;
 using BIT.Audio;
@@ -116,7 +117,7 @@ namespace BIT.UI
         private void Update()
         {
             // Tecla de pausa (como backup si el GameManager no lo maneja)
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 TogglePause();
             }

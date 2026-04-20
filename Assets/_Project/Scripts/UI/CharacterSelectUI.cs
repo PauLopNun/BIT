@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem.UI;
 using TMPro;
 using BIT.Data;
 using BIT.Core;
@@ -127,9 +128,12 @@ namespace BIT.UI
 
             canvasGO.AddComponent<GraphicRaycaster>();
 
-            var evSystem = new GameObject("EventSystem");
-            evSystem.AddComponent<UnityEngine.EventSystems.EventSystem>();
-            evSystem.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            if (UnityEngine.EventSystems.EventSystem.current == null)
+            {
+                var evSystem = new GameObject("EventSystem");
+                evSystem.AddComponent<UnityEngine.EventSystems.EventSystem>();
+                evSystem.AddComponent<InputSystemUIInputModule>();
+            }
 
             // ── Fondo oscuro ─────────────────────────────────────────────
             var bg = MakeImage(canvasGO, "Background", new Color(0.05f, 0.04f, 0.08f));
@@ -220,8 +224,8 @@ namespace BIT.UI
             // "Avatar": sprite real del personaje o fallback de color
             var avatarGO = MakeImage(innerGO, "Avatar", new Color(0.08f, 0.06f, 0.12f));
             var avatarRT = avatarGO.GetComponent<RectTransform>();
-            avatarRT.anchorMin = new Vector2(0.15f, 0.55f);
-            avatarRT.anchorMax = new Vector2(0.85f, 0.95f);
+            avatarRT.anchorMin = new Vector2(0.15f, 0.65f);
+            avatarRT.anchorMax = new Vector2(0.85f, 0.97f);
             avatarRT.offsetMin = avatarRT.offsetMax = Vector2.zero;
 
             Sprite characterSprite = TryLoadSprite(data.spritePath);
@@ -248,14 +252,14 @@ namespace BIT.UI
 
             // Nombre del personaje
             AddText(innerGO, "Name", data.characterName, 22, FontStyles.Bold, data.spriteColor,
-                new Vector2(0f, 0.47f), new Vector2(1f, 0.57f));
+                new Vector2(0f, 0.55f), new Vector2(1f, 0.64f));
 
             // Descripción
             AddText(innerGO, "Desc", data.description, 14, FontStyles.Normal, new Color(0.75f, 0.75f, 0.75f),
-                new Vector2(0.05f, 0.37f), new Vector2(0.95f, 0.49f));
+                new Vector2(0.05f, 0.46f), new Vector2(0.95f, 0.55f));
 
             // Barras de estadísticas
-            float barY = 0.28f;
+            float barY = 0.375f;
             AddStatBar(innerGO, "❤ Vida",  NormalizeHealth(data.maxHealth),  data.spriteColor, ref barY);
             AddStatBar(innerGO, "⚡ Veloc", NormalizeSpeed(data.moveSpeed),   data.spriteColor, ref barY);
             AddStatBar(innerGO, "⚔ Daño",  NormalizeDamage(data.meleeDamage),data.spriteColor, ref barY);
@@ -263,7 +267,7 @@ namespace BIT.UI
 
             // Botón ELEGIR
             var selGO = BuildButton(innerGO, "ELEGIR", new Color(0.2f, 0.2f, 0.3f),
-                new Vector2(0.1f, 0.02f), new Vector2(0.9f, 0.15f));
+                new Vector2(0.05f, 0.01f), new Vector2(0.95f, 0.11f));
             int capturedIndex = index;
             selGO.GetComponent<Button>().onClick.AddListener(() => SelectCharacter(capturedIndex));
             SetButtonTextColor(selGO, data.spriteColor, 20);
