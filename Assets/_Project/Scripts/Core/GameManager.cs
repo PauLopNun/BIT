@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
 using BIT.Data;
 using BIT.UI;
 using BIT.Audio;
@@ -180,7 +181,7 @@ namespace BIT.Core
             }
 
             // Tecla de pausa (Escape)
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 if (_currentState == GameState.Playing)
                 {
