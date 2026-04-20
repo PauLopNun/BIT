@@ -117,6 +117,10 @@ namespace BIT.Player
             rb.freezeRotation = true;        // No rotar al chocar
             rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
+            // Auto-add AutoShooter (Vampire Survivors style weapon)
+            if (GetComponent<AutoShooter>() == null)
+                gameObject.AddComponent<AutoShooter>();
+
             // Obtenemos las acciones del Input System
             if (playerInput != null && playerInput.actions != null)
             {

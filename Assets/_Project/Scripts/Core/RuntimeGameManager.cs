@@ -694,16 +694,23 @@ namespace BIT.Core
         {
             _isGameOver = true;
             _gameOverPanel.SetActive(true);
-            _gameOverText.text = $"GAME OVER\n\nScore: {_score}\n\nPress R to Restart";
+            _gameOverText.text = $"GAME OVER\n\nScore: {_score}\n\nVolviendo al menú...";
 
-            // Guardar puntuacion en el ranking
             SaveScoreToRanking();
 
-            // Pausar musica
             if (_musicSource != null)
                 _musicSource.Pause();
 
             Debug.Log("[RuntimeGameManager] Game Over!");
+            StartCoroutine(ReturnToMenuAfterDelay(3f));
+        }
+
+        System.Collections.IEnumerator ReturnToMenuAfterDelay(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            Time.timeScale = 1f;
+            UnityEngine.SceneManagement.SceneManager.LoadScene(
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
         }
 
         void Victory()
