@@ -49,7 +49,7 @@ namespace BIT.Core
         [SerializeField] private GameObject _rangedEnemyPrefab;
 
         [Tooltip("Ronda a partir de la cual aparecen enemigos a distancia")]
-        [SerializeField] private int _rangedEnemyUnlockWave = 4;
+        [SerializeField] private int _rangedEnemyUnlockWave = 2;
 
         [Header("=== BOSS ===")]
         [Tooltip("Prefab del boss (si está vacío se usa el enemigo fuerte con stats escalados x8)")]
