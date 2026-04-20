@@ -260,6 +260,22 @@ namespace BIT.Core
             waveMsgRT.sizeDelta = new Vector2(0, 80);
             _waveMessageGO.SetActive(false);
 
+            // Panel de controles (esquina inferior izquierda)
+            var ctrlGO = new GameObject("ControlsHint");
+            ctrlGO.transform.SetParent(_canvas.transform, false);
+            var ctrlText = ctrlGO.AddComponent<Text>();
+            ctrlText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            ctrlText.fontSize = 14;
+            ctrlText.color = new Color(0.85f, 0.85f, 0.85f, 0.75f);
+            ctrlText.alignment = TextAnchor.LowerLeft;
+            ctrlText.text = "WASD  Mover\nClick/Esp  Atacar\nShift/RMB  Dash (x2 dmg)\nE  Interactuar\nEsc  Pausa";
+            var ctrlRT = ctrlGO.GetComponent<RectTransform>();
+            ctrlRT.anchorMin = new Vector2(0f, 0f);
+            ctrlRT.anchorMax = new Vector2(0f, 0f);
+            ctrlRT.pivot = new Vector2(0f, 0f);
+            ctrlRT.anchoredPosition = new Vector2(10f, 10f);
+            ctrlRT.sizeDelta = new Vector2(200f, 90f);
+
             Debug.Log("[RuntimeGameManager] UI creada");
         }
 
@@ -494,6 +510,7 @@ namespace BIT.Core
 
         void UpdateUI()
         {
+            if (_hearts == null) return;
             // Actualizar corazones
             float healthPerHeart = (float)_maxHealth / maxHearts;
             for (int i = 0; i < _hearts.Length; i++)
