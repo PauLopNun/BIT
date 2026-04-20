@@ -45,6 +45,12 @@ namespace BIT.Core
         [Tooltip("Enemigo fuerte (disponible desde ronda 5)")]
         [SerializeField] private GameObject _tankEnemyPrefab;
 
+        [Tooltip("Enemigo a distancia (si está vacío se crea en runtime a partir de ronda 4)")]
+        [SerializeField] private GameObject _rangedEnemyPrefab;
+
+        [Tooltip("Ronda a partir de la cual aparecen enemigos a distancia")]
+        [SerializeField] private int _rangedEnemyUnlockWave = 4;
+
         [Header("=== BOSS ===")]
         [Tooltip("Prefab del boss (si está vacío se usa el enemigo fuerte con stats escalados x8)")]
         [SerializeField] private GameObject _bossPrefab;
@@ -365,16 +371,66 @@ namespace BIT.Core
         /// <summary>Spawna un enemigo en una posición válida.</summary>
         private GameObject SpawnEnemy()
         {
-            GameObject prefab = ChooseEnemyPrefab();
-            if (prefab == null) return null;
-
             Vector3 spawnPos = GetSpawnPosition();
-            GameObject enemy = Instantiate(prefab, spawnPos, Quaternion.identity);
+            GameObject enemy;
 
-            // Escalamos estadísticas según la ronda (cada 5 rondas, +20% stats)
+            // 25% chance of spawning a ranged enemy once unlocked
+            if (_currentWave >= _rangedEnemyUnlockWave && Random.value < 0.25f)
+            {
+                enemy = _rangedEnemyPrefab != null
+                    ? Instantiate(_rangedEnemyPrefab, spawnPos, Quaternion.identity)
+                    : CreateRangedEnemyAtRuntime(spawnPos);
+            }
+            else
+            {
+                GameObject prefab = ChooseEnemyPrefab();
+                if (prefab == null) return null;
+                enemy = Instantiate(prefab, spawnPos, Quaternion.identity);
+            }
+
             ScaleEnemyStats(enemy);
-
             return enemy;
+        }
+
+        private GameObject CreateRangedEnemyAtRuntime(Vector3 pos)
+        {
+            var go = new GameObject("Enemy_Ranged");
+            go.transform.position = pos;
+            go.tag = "Enemy";
+
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.color = new Color(0.5f, 0.2f, 1f); // purple to distinguish from melee
+            sr.sortingOrder = 2;
+
+            // Try to load SkullBlue sprite
+            var sprite = LoadFirstAvailableSprite(
+                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/SkullBlue/SpriteSheet.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Skull/SpriteSheet.png");
+            if (sprite != null) sr.sprite = sprite;
+
+            var rb = go.AddComponent<Rigidbody2D>();
+            rb.gravityScale = 0f;
+            rb.freezeRotation = true;
+
+            var col = go.AddComponent<CircleCollider2D>();
+            col.radius = 0.4f;
+
+            go.AddComponent<BIT.Enemy.RangedEnemyAI>();
+            return go;
+        }
+
+        static Sprite LoadFirstAvailableSprite(params string[] paths)
+        {
+#if UNITY_EDITOR
+            foreach (var path in paths)
+            {
+                var sp = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                if (sp != null) return sp;
+                foreach (var a in UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path))
+                    if (a is Sprite s) return s;
+            }
+#endif
+            return null;
         }
 
         /// <summary>Escala las estadísticas del enemigo según la ronda.</summary>
@@ -392,6 +448,9 @@ namespace BIT.Core
 
             var simpleAI = enemy.GetComponent<SimpleEnemyAI>();
             if (simpleAI != null) { simpleAI.ScaleStats(scaleFactor); return; }
+
+            var rangedAI = enemy.GetComponent<BIT.Enemy.RangedEnemyAI>();
+            if (rangedAI != null) { rangedAI.ScaleStats(scaleFactor); return; }
 
             var bossAI = enemy.GetComponent<BossEnemyAI>();
             if (bossAI != null) bossAI.ScaleStats(scaleFactor);

@@ -119,6 +119,49 @@ namespace BIT.Core
                     description = "+5 daño\ny +10% velocidad",
                     apply = p => { p.meleeDamage += 5; p.moveSpeed *= 1.10f; }
                 },
+                new UpgradeOption
+                {
+                    name = "Disparo Rápido",
+                    description = "Disparo auto\n30% más rápido",
+                    apply = p => {
+                        var as_ = p.GetComponent<AutoShooter>();
+                        if (as_ != null) as_.fireInterval = Mathf.Max(0.4f, as_.fireInterval * 0.70f);
+                    }
+                },
+                new UpgradeOption
+                {
+                    name = "Bala Potente",
+                    description = "+15 daño\nen disparo auto",
+                    apply = p => {
+                        var as_ = p.GetComponent<AutoShooter>();
+                        if (as_ != null) as_.bulletDamage += 15;
+                    }
+                },
+                new UpgradeOption
+                {
+                    name = "Francotirador",
+                    description = "Rango de disparo\nauto +50%",
+                    apply = p => {
+                        var as_ = p.GetComponent<AutoShooter>();
+                        if (as_ != null) as_.detectionRange *= 1.50f;
+                    }
+                },
+                new UpgradeOption
+                {
+                    name = "Explosivo",
+                    description = "+20 daño auto\n+15 daño melee",
+                    apply = p => {
+                        var as_ = p.GetComponent<AutoShooter>();
+                        if (as_ != null) as_.bulletDamage += 20;
+                        p.meleeDamage += 15;
+                    }
+                },
+                new UpgradeOption
+                {
+                    name = "Dash Mejorado",
+                    description = "Velocidad de dash\n+30%",
+                    apply = p => p.dashSpeed *= 1.30f
+                },
             };
         }
 
