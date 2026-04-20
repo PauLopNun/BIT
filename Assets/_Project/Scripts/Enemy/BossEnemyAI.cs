@@ -267,11 +267,13 @@ namespace BIT.Enemy
             }
         }
 
-        public void TakeDamage(int damage)
+        public void TakeDamage(int damage, Vector2 knockbackDir = default)
         {
             if (_isDead) return;
             _currentHealth -= damage;
             StartCoroutine(DamageFlash());
+            if (knockbackDir != Vector2.zero && _rb != null)
+                _rb.linearVelocity = knockbackDir.normalized * 2.5f; // boss knockback reducido
             if (_currentHealth <= 0) Die();
         }
 

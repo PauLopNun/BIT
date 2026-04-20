@@ -444,23 +444,28 @@ namespace BIT.Enemy
         /// <summary>
         /// El enemigo recibe daño (llamado desde el arma del jugador).
         /// </summary>
-        public void TakeDamage(int damage)
+        public void TakeDamage(int damage, Vector2 knockbackDir = default)
         {
             _currentHealth -= damage;
 
-            // Animación de daño
             _animator?.SetTrigger(ANIM_HURT);
-
-            // Efecto visual
             StartCoroutine(DamageFlash());
+            StartCoroutine(HitStun(knockbackDir));
 
-            Debug.Log($"[EnemyAI] Daño recibido: {damage}. Vida: {_currentHealth}/{_maxHealth}");
+            if (_currentHealth <= 0) Die();
+        }
 
-            // Si muere
-            if (_currentHealth <= 0)
-            {
-                Die();
-            }
+        private System.Collections.IEnumerator HitStun(Vector2 knockbackDir)
+        {
+            // Knockback
+            if (_rb != null && knockbackDir != Vector2.zero)
+                _rb.linearVelocity = knockbackDir.normalized * 6f;
+
+            // Hit-pause: congela el enemigo 0.06s para que el golpe "se sienta"
+            float prevSpeed = _moveSpeed;
+            _moveSpeed = 0f;
+            yield return new WaitForSeconds(0.06f);
+            if (this != null) _moveSpeed = prevSpeed;
         }
 
         /// <summary>

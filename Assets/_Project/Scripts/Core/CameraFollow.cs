@@ -75,13 +75,19 @@ namespace BIT.Core
         private Vector3 _lookAheadOffset;
         private Rigidbody2D _targetRigidbody;
 
+        // Screen shake
+        public static CameraFollow Instance { get; private set; }
+        private float _shakeDuration;
+        private float _shakeMagnitude;
+
         // ====================================================================
         // INICIALIZACIÓN
         // ====================================================================
 
+        private void Awake() { Instance = this; }
+
         private void Start()
         {
-            // Buscamos al jugador automáticamente si está configurado
             if (_findPlayerAutomatically && _target == null)
             {
                 GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -162,8 +168,20 @@ namespace BIT.Core
             // Mantenemos la Z fija
             smoothedPosition.z = _offset.z;
 
-            // Aplicamos la nueva posición
+            // Screen shake
+            if (_shakeDuration > 0f)
+            {
+                smoothedPosition += (Vector3)Random.insideUnitCircle * _shakeMagnitude;
+                _shakeDuration -= Time.deltaTime;
+            }
+
             transform.position = smoothedPosition;
+        }
+
+        public void Shake(float duration = 0.15f, float magnitude = 0.12f)
+        {
+            _shakeDuration = duration;
+            _shakeMagnitude = magnitude;
         }
 
         // ====================================================================

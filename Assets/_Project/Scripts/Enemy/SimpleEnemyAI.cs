@@ -224,23 +224,16 @@ namespace BIT.Core
         /// <summary>
         /// El enemigo recibe daño (llamado desde proyectiles o ataque melee)
         /// </summary>
-        public void TakeDamage(int amount)
+        public void TakeDamage(int amount, Vector2 knockbackDir = default)
         {
             if (_isDead) return;
 
             _currentHealth -= amount;
-            Debug.Log($"[SimpleEnemyAI] {gameObject.name} recibió {amount} de daño. Vida: {_currentHealth}/{maxHealth}");
 
-            // Efecto visual de daño
             StartCoroutine(DamageFlash());
+            StartCoroutine(HitStun(knockbackDir));
+            VFXManager.Instance?.SpawnHitEffect(transform.position);
 
-            // Efecto VFX
-            if (VFXManager.Instance != null)
-            {
-                VFXManager.Instance.SpawnHitEffect(transform.position);
-            }
-
-            // Verificar muerte
             if (_currentHealth <= 0)
             {
                 Die();
@@ -250,13 +243,22 @@ namespace BIT.Core
         System.Collections.IEnumerator DamageFlash()
         {
             if (_spriteRenderer == null) yield break;
-
             Color originalColor = _spriteRenderer.color;
             _spriteRenderer.color = Color.red;
             yield return new WaitForSeconds(0.1f);
-
             if (_spriteRenderer != null)
                 _spriteRenderer.color = originalColor;
+        }
+
+        System.Collections.IEnumerator HitStun(Vector2 knockbackDir)
+        {
+            if (_rb != null && knockbackDir != Vector2.zero)
+                _rb.linearVelocity = knockbackDir.normalized * 5f;
+
+            float prev = moveSpeed;
+            moveSpeed = 0f;
+            yield return new WaitForSeconds(0.06f);
+            if (this != null) moveSpeed = prev;
         }
 
         // ====================================================================

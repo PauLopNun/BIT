@@ -352,40 +352,27 @@ namespace BIT.Player
             int enemiesHit = 0;
             foreach (Collider2D hit in hitColliders)
             {
-                // Verificar si es un enemigo
-                if (hit.CompareTag("Enemy"))
-                {
-                    // Intentar hacer daño - primero con SimpleEnemyAI
-                    var simpleEnemy = hit.GetComponent<BIT.Core.SimpleEnemyAI>();
-                    if (simpleEnemy != null)
-                    {
-                        simpleEnemy.TakeDamage(meleeDamage);
-                        enemiesHit++;
-                        continue;
-                    }
+                if (!hit.CompareTag("Enemy")) continue;
 
-                    // Fallback a EnemyAI
-                    var enemyAI = hit.GetComponent<BIT.Enemy.EnemyAI>();
-                    if (enemyAI != null)
-                    {
-                        enemyAI.TakeDamage(meleeDamage);
-                        enemiesHit++;
-                        continue;
-                    }
+                Vector2 knockDir = (hit.transform.position - transform.position).normalized;
 
-                    // Fallback a IDamageable
-                    var damageable = hit.GetComponent<IDamageable>();
-                    if (damageable != null)
-                    {
-                        damageable.TakeDamage(meleeDamage);
-                        enemiesHit++;
-                    }
-                }
+                var simpleEnemy = hit.GetComponent<BIT.Core.SimpleEnemyAI>();
+                if (simpleEnemy != null) { simpleEnemy.TakeDamage(meleeDamage, knockDir); enemiesHit++; continue; }
+
+                var enemyAI = hit.GetComponent<BIT.Enemy.EnemyAI>();
+                if (enemyAI != null) { enemyAI.TakeDamage(meleeDamage, knockDir); enemiesHit++; continue; }
+
+                var bossAI = hit.GetComponent<BIT.Enemy.BossEnemyAI>();
+                if (bossAI != null) { bossAI.TakeDamage(meleeDamage, knockDir); enemiesHit++; continue; }
+
+                var damageable = hit.GetComponent<IDamageable>();
+                if (damageable != null) { damageable.TakeDamage(meleeDamage); enemiesHit++; }
             }
 
             if (enemiesHit > 0)
             {
-                Debug.Log($"[Player] Ataque melee impactó {enemiesHit} enemigo(s)!");
+                // Screen shake al golpear
+                BIT.Core.CameraFollow.Instance?.Shake(0.12f, 0.10f);
             }
         }
 
@@ -427,10 +414,9 @@ namespace BIT.Player
         public void TakeDamage(int damage)
         {
             currentHealth -= damage;
-            Debug.Log("[Player] Daño recibido: " + damage + ". Vida: " + currentHealth);
 
-            // Efecto visual de daño
             StartCoroutine(DamageFlash());
+            BIT.Core.CameraFollow.Instance?.Shake(0.2f, 0.18f); // shake más fuerte al recibir daño
 
             // Actualizar UI via RuntimeGameManager
             if (BIT.Core.RuntimeGameManager.Instance != null)
@@ -616,12 +602,13 @@ namespace BIT.Player
                 {
                     if (!hit.CompareTag("Enemy")) continue;
                     int dashDmg = meleeDamage * 2;
+                    Vector2 kDir = dir;
                     var simpleAI = hit.GetComponent<BIT.Core.SimpleEnemyAI>();
-                    if (simpleAI != null) { simpleAI.TakeDamage(dashDmg); continue; }
+                    if (simpleAI != null) { simpleAI.TakeDamage(dashDmg, kDir); continue; }
                     var enemyAI = hit.GetComponent<BIT.Enemy.EnemyAI>();
-                    if (enemyAI != null) { enemyAI.TakeDamage(dashDmg); continue; }
+                    if (enemyAI != null) { enemyAI.TakeDamage(dashDmg, kDir); continue; }
                     var bossAI = hit.GetComponent<BIT.Enemy.BossEnemyAI>();
-                    if (bossAI != null) bossAI.TakeDamage(dashDmg);
+                    if (bossAI != null) bossAI.TakeDamage(dashDmg, kDir);
                 }
 
                 elapsed += Time.deltaTime;
