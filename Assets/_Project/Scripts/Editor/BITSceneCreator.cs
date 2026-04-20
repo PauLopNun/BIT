@@ -5,6 +5,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.InputSystem.UI;
 using TMPro;
 using BIT.Core;
 using BIT.Events;
@@ -93,7 +94,7 @@ namespace BIT.Editor
             // ── EventSystem ───────────────────────────────────────────────
             var evGO = new GameObject("EventSystem");
             evGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
-            evGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            evGO.AddComponent<InputSystemUIInputModule>();
 
             // ── Canvas ────────────────────────────────────────────────────
             var canvasGO = new GameObject("Canvas");
@@ -314,7 +315,7 @@ namespace BIT.Editor
             // EventSystem
             var evGO = new GameObject("EventSystem");
             evGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
-            evGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            evGO.AddComponent<InputSystemUIInputModule>();
 
             // CharacterSelectUI (crea toda la UI en runtime)
             var uiGO = new GameObject("CharacterSelectUI");
