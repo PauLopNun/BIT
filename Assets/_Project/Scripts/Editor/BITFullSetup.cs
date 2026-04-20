@@ -6,7 +6,9 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using BIT.Core;
+using BIT.Events;
 using BIT.Interactables;
+using BIT.Player;
 
 // ============================================================================
 // BITFULLSETUP.CS — UN SOLO CLIC para tener el juego funcionando al 100%
@@ -43,7 +45,7 @@ namespace BIT.Editor
             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
 
             int step = 0;
-            int total = 8;
+            int total = 10;
 
             Progress(ref step, total, "Cortando tilesets PNG (16×16)…");
             BITAutoSetup.SetupTilesets();
@@ -51,17 +53,21 @@ namespace BIT.Editor
             Progress(ref step, total, "Configurando escena de juego…");
             BITAutoSetup.SetupScene();
 
+            Progress(ref step, total, "Creando prefabs de Hazards y Ranking…");
+            CreateHazardPrefabs();
+            CreateRankingEntryPrefab();
+
+            Progress(ref step, total, "Creando GameEventSO assets…");
+            CreateGameEvents();
+
             Progress(ref step, total, "Creando escenas MainMenu y CharacterSelect…");
             BITSceneCreator.CreateScenes();
 
-            Progress(ref step, total, "Creando prefabs de Hazards…");
-            CreateHazardPrefabs();
-
-            Progress(ref step, total, "Creando prefab de entrada de ranking…");
-            CreateRankingEntryPrefab();
-
             Progress(ref step, total, "Conectando audio…");
             BITSceneCreator.WireAudio();
+
+            Progress(ref step, total, "Arreglando prefabs (OrbitWeapon, Pickups)…");
+            FixPrefabs();
 
             Progress(ref step, total, "Conectando sprites FX al VFXManager…");
             WireVFXSprites();
@@ -76,14 +82,17 @@ namespace BIT.Editor
                 "¡El juego está configurado al 100%!\n\n" +
                 "✓ Tilesets cortados en sprites 16×16\n" +
                 "✓ Escena de juego configurada (gamesetupscene)\n" +
-                "✓ MainMenu.unity y CharacterSelect.unity creadas\n" +
+                "✓ MainMenu.unity con Ranking funcional y CharacterSelect.unity creadas\n" +
                 "✓ Build Settings: MainMenu(0) → CharacterSelect(1) → gamesetupscene(2)\n" +
                 "✓ Prefabs de hazards creados\n" +
-                "✓ Prefab de ranking creado\n" +
+                "✓ RankingEntry.prefab creado y conectado\n" +
+                "✓ GameEventSO assets creados\n" +
+                "✓ OrbitWeapon añadido al prefab Player (req. 2.4)\n" +
+                "✓ HealthPickup/ScorePickup añadidos a Heart/Coin prefabs (req. 2.7)\n" +
                 "✓ Audio conectado\n" +
                 "✓ Sprites FX conectados\n\n" +
-                "Pulsa PLAY en gamesetupscene para probar.\n" +
-                "O pulsa PLAY en MainMenu para el flujo completo.",
+                "Pulsa PLAY en MainMenu para el flujo completo:\n" +
+                "MainMenu → CharacterSelect → Juego",
                 "¡Perfecto!");
         }
 
@@ -342,6 +351,117 @@ namespace BIT.Editor
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             Object.DestroyImmediate(go);
             return prefab;
+        }
+
+        // ====================================================================
+        // FIX PREFABS — OrbitWeapon en Player, HealthPickup/ScorePickup en pickups
+        // ====================================================================
+
+        static void FixPrefabs()
+        {
+            FixPlayerPrefab();
+            FixPickupPrefab<HealthPickup>(PREFABS + "/Pickups/Heart.prefab",   "Heart",   new Color(1f, 0.2f, 0.2f));
+            FixPickupPrefab<ScorePickup> (PREFABS + "/Pickups/Coin.prefab",    "Coin",    new Color(1f, 0.85f, 0.1f));
+        }
+
+        static void FixPlayerPrefab()
+        {
+            string path = PREFABS + "/Player/Player.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null) { Debug.LogWarning("[BITFullSetup] Player.prefab no encontrado."); return; }
+
+            using (var scope = new PrefabUtility.EditPrefabContentsScope(path))
+            {
+                var root = scope.prefabContentsRoot;
+
+                // Ya tiene OrbitWeapon?
+                if (root.GetComponentInChildren<BIT.Player.OrbitWeapon>() != null) return;
+
+                // Crear GO hijo "Weapon"
+                var weaponGO = new GameObject("Weapon");
+                weaponGO.transform.SetParent(root.transform, false);
+                weaponGO.transform.localPosition = new Vector3(0.8f, 0f, 0f);
+
+                // SpriteRenderer con sprite de espada del pack si existe
+                var sr = weaponGO.AddComponent<SpriteRenderer>();
+                sr.sortingOrder = 5;
+                string swordPath = "Assets/_Project/Sprites/Ninja Adventure/Actor/Weapon/Sword/SpriteSheet.png";
+                var swordSprite = AssetDatabase.LoadAssetAtPath<Sprite>(swordPath);
+                if (swordSprite == null)
+                {
+                    var allSprites = AssetDatabase.LoadAllAssetsAtPath(swordPath);
+                    foreach (var a in allSprites) if (a is Sprite s) { swordSprite = s; break; }
+                }
+                if (swordSprite != null) sr.sprite = swordSprite;
+
+                // CircleCollider2D trigger para daño al contacto
+                var col = weaponGO.AddComponent<CircleCollider2D>();
+                col.isTrigger = true;
+                col.radius = 0.25f;
+
+                // OrbitWeapon component
+                var ow = weaponGO.AddComponent<BIT.Player.OrbitWeapon>();
+                var soOW = new SerializedObject(ow);
+                soOW.FindProperty("_orbitRadius").floatValue = 0.8f;
+                soOW.FindProperty("_rotationSpeed").floatValue = 15f;
+                soOW.FindProperty("_damage").intValue = 10;
+                var sprProp = soOW.FindProperty("_weaponSprite");
+                if (sprProp != null) sprProp.objectReferenceValue = sr;
+                soOW.ApplyModifiedProperties();
+            }
+
+            Debug.Log("[BITFullSetup] OrbitWeapon añadido al Player.prefab.");
+        }
+
+        static void FixPickupPrefab<T>(string path, string name, Color color)
+            where T : MonoBehaviour
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null) { Debug.LogWarning($"[BITFullSetup] {name}.prefab no encontrado: {path}"); return; }
+
+            // Ya tiene el componente?
+            if (prefab.GetComponent<T>() != null) return;
+
+            using (var scope = new PrefabUtility.EditPrefabContentsScope(path))
+            {
+                var root = scope.prefabContentsRoot;
+                if (root.GetComponent<T>() != null) return;
+
+                root.AddComponent<T>();
+
+                // Asegurar SpriteRenderer visible
+                var sr = root.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.color = color;
+            }
+
+            Debug.Log($"[BITFullSetup] {typeof(T).Name} añadido a {name}.prefab.");
+        }
+
+        // ====================================================================
+        // CREAR GAMEEVENTSO ASSETS
+        // ====================================================================
+
+        static void CreateGameEvents()
+        {
+            string eventsDir = "Assets/_Project/SO_Data/Events";
+            if (!Directory.Exists(eventsDir))
+                Directory.CreateDirectory(eventsDir);
+
+            CreateEventAsset(eventsDir + "/OnPlayerDamage.asset");
+            CreateEventAsset(eventsDir + "/OnPlayerAttack.asset");
+            CreateEventAsset(eventsDir + "/OnPickup.asset");
+            CreateEventAsset(eventsDir + "/OnCoin.asset");
+            CreateEventAsset(eventsDir + "/OnPlayerDeath.asset");
+
+            AssetDatabase.SaveAssets();
+            Debug.Log("[BITFullSetup] GameEventSO assets creados en " + eventsDir);
+        }
+
+        static void CreateEventAsset(string path)
+        {
+            if (File.Exists(path)) return;
+            var asset = ScriptableObject.CreateInstance<BIT.Events.GameEventSO>();
+            AssetDatabase.CreateAsset(asset, path);
         }
 
         // ====================================================================

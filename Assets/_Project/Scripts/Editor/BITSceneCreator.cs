@@ -84,40 +84,48 @@ namespace BIT.Editor
             camGO.tag = "MainCamera";
             camGO.transform.position = new Vector3(0, 0, -10);
 
-            // ── Managers (GameManager + AudioManager como singletons) ──────
-            var managerGO = new GameObject("GameManager");
-            managerGO.AddComponent<GameManager>();
+            // ── Managers ──────────────────────────────────────────────────
+            new GameObject("GameManager").AddComponent<GameManager>();
+            new GameObject("AudioManager").AddComponent<AudioManager>();
+            new GameObject("SaveSystem").AddComponent<BIT.Core.SaveSystem>();
 
-            var audioGO = new GameObject("AudioManager");
-            audioGO.AddComponent<AudioManager>();
+            // ── EventSystem ───────────────────────────────────────────────
+            var evGO = new GameObject("EventSystem");
+            evGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            evGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
 
             // ── Canvas ────────────────────────────────────────────────────
             var canvasGO = new GameObject("Canvas");
             var canvas = canvasGO.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-
             var scaler = canvasGO.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
-
             canvasGO.AddComponent<GraphicRaycaster>();
-
-            // EventSystem
-            var evGO = new GameObject("EventSystem");
-            evGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
-            evGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
 
             // ── Fondo ─────────────────────────────────────────────────────
             var bgGO = new GameObject("Background");
             bgGO.transform.SetParent(canvasGO.transform, false);
-            var bgImg = bgGO.AddComponent<Image>();
-            bgImg.color = new Color(0.04f, 0.03f, 0.06f);
+            bgGO.AddComponent<Image>().color = new Color(0.04f, 0.03f, 0.06f);
             StretchRT(bgGO.GetComponent<RectTransform>());
 
-            // ── Título del juego ──────────────────────────────────────────
+            // ── MainMenuUI manager ────────────────────────────────────────
+            var menuMgrGO = new GameObject("MainMenuUI");
+            menuMgrGO.transform.SetParent(canvasGO.transform, false);
+            var mainMenuUI = menuMgrGO.AddComponent<BIT.UI.MainMenuUI>();
+
+            // ================================================================
+            // PANEL PRINCIPAL
+            // ================================================================
+            var mainPanel = new GameObject("MainPanel");
+            mainPanel.transform.SetParent(canvasGO.transform, false);
+            mainPanel.AddComponent<Image>().color = new Color(0, 0, 0, 0);
+            StretchRT(mainPanel.GetComponent<RectTransform>());
+
+            // Título
             var titleGO = new GameObject("GameTitle");
-            titleGO.transform.SetParent(canvasGO.transform, false);
+            titleGO.transform.SetParent(mainPanel.transform, false);
             var titleTMP = titleGO.AddComponent<TextMeshProUGUI>();
             titleTMP.text = "BIT";
             titleTMP.fontSize = 120;
@@ -128,44 +136,152 @@ namespace BIT.Editor
 
             // Subtítulo
             var subGO = new GameObject("Subtitle");
-            subGO.transform.SetParent(canvasGO.transform, false);
+            subGO.transform.SetParent(mainPanel.transform, false);
             var subTMP = subGO.AddComponent<TextMeshProUGUI>();
-            subTMP.text = "Un juego de acción y supervivencia";
+            subTMP.text = "Acción y supervivencia Ninja";
             subTMP.fontSize = 24;
             subTMP.alignment = TextAlignmentOptions.Center;
             subTMP.color = new Color(0.65f, 0.65f, 0.65f);
             SetAnchor(subGO, 0.2f, 0.60f, 0.8f, 0.68f);
 
-            // ── Botones ───────────────────────────────────────────────────
-            // JUGAR → CharacterSelect
-            var playBtn = MakeButton(canvasGO, "JUGAR",
-                new Color(0.15f, 0.65f, 0.25f), new Color(1f, 1f, 1f), 32,
+            // Campo de nombre del jugador
+            var nameInputGO = new GameObject("NameInput");
+            nameInputGO.transform.SetParent(mainPanel.transform, false);
+            nameInputGO.AddComponent<Image>().color = new Color(0.12f, 0.1f, 0.18f);
+            SetAnchor(nameInputGO, 0.3f, 0.57f, 0.7f, 0.63f);
+            var nameInput = nameInputGO.AddComponent<TMPro.TMP_InputField>();
+            var nameTextAreaGO = new GameObject("Text Area");
+            nameTextAreaGO.transform.SetParent(nameInputGO.transform, false);
+            var nameTextAreaRT = nameTextAreaGO.AddComponent<RectTransform>();
+            StretchRT(nameTextAreaRT);
+            var nameTMP = nameTextAreaGO.AddComponent<TextMeshProUGUI>();
+            nameTMP.fontSize = 22;
+            nameTMP.alignment = TextAlignmentOptions.Center;
+            nameTMP.color = Color.white;
+            nameInput.textComponent = nameTMP;
+            var namePlaceholderGO = new GameObject("Placeholder");
+            namePlaceholderGO.transform.SetParent(nameInputGO.transform, false);
+            var namePlaceholderRT = namePlaceholderGO.AddComponent<RectTransform>();
+            StretchRT(namePlaceholderRT);
+            var placeholderTMP = namePlaceholderGO.AddComponent<TextMeshProUGUI>();
+            placeholderTMP.text = "Introduce tu nombre…";
+            placeholderTMP.fontSize = 22;
+            placeholderTMP.alignment = TextAlignmentOptions.Center;
+            placeholderTMP.color = new Color(0.5f, 0.5f, 0.5f);
+            nameInput.placeholder = placeholderTMP;
+
+            // Botón JUGAR → CharacterSelect
+            var playBtn = MakeButton(mainPanel, "JUGAR",
+                new Color(0.15f, 0.65f, 0.25f), Color.white, 32,
                 new Vector2(0.35f, 0.45f), new Vector2(0.65f, 0.57f));
             playBtn.GetComponent<Button>().onClick.AddListener(() =>
                 SceneManager.LoadScene("CharacterSelect"));
 
-            // RANKING
-            var rankBtn = MakeButton(canvasGO, "RANKING",
+            // Botón RANKING — se conecta vía MainMenuUI
+            var rankBtn = MakeButton(mainPanel, "RANKING",
                 new Color(0.15f, 0.30f, 0.55f), new Color(0.9f, 0.9f, 1f), 28,
                 new Vector2(0.35f, 0.32f), new Vector2(0.65f, 0.43f));
-            rankBtn.GetComponent<Button>().onClick.AddListener(() =>
-                Debug.Log("[MainMenu] Ranking button pressed"));
 
-            // SALIR
-            var quitBtn = MakeButton(canvasGO, "SALIR",
+            // Botón SALIR
+            var quitBtn = MakeButton(mainPanel, "SALIR",
                 new Color(0.25f, 0.10f, 0.10f), new Color(1f, 0.6f, 0.6f), 24,
                 new Vector2(0.40f, 0.20f), new Vector2(0.60f, 0.30f));
             quitBtn.GetComponent<Button>().onClick.AddListener(() => Application.Quit());
 
+            // High score
+            var hsGO = new GameObject("HighScore");
+            hsGO.transform.SetParent(mainPanel.transform, false);
+            var hsTMP = hsGO.AddComponent<TextMeshProUGUI>();
+            hsTMP.text = "High Score: 0";
+            hsTMP.fontSize = 20;
+            hsTMP.alignment = TextAlignmentOptions.Center;
+            hsTMP.color = new Color(1f, 0.85f, 0.2f);
+            SetAnchor(hsGO, 0.2f, 0.12f, 0.8f, 0.20f);
+
             // Versión
             var verGO = new GameObject("Version");
-            verGO.transform.SetParent(canvasGO.transform, false);
+            verGO.transform.SetParent(mainPanel.transform, false);
             var verTMP = verGO.AddComponent<TextMeshProUGUI>();
             verTMP.text = "v1.0 — Ninja Adventure Pack (CC0)";
             verTMP.fontSize = 16;
             verTMP.alignment = TextAlignmentOptions.Right;
             verTMP.color = new Color(0.35f, 0.35f, 0.35f);
             SetAnchor(verGO, 0.5f, 0.01f, 0.99f, 0.07f);
+
+            // ================================================================
+            // PANEL RANKING (con RankingUI)
+            // ================================================================
+            var rankingPanel = new GameObject("RankingPanel");
+            rankingPanel.transform.SetParent(canvasGO.transform, false);
+            rankingPanel.AddComponent<Image>().color = new Color(0.04f, 0.03f, 0.08f, 0.97f);
+            StretchRT(rankingPanel.GetComponent<RectTransform>());
+            rankingPanel.SetActive(false);
+
+            var rankUI = rankingPanel.AddComponent<BIT.UI.RankingUI>();
+
+            var rankTitleGO = new GameObject("RankingTitle");
+            rankTitleGO.transform.SetParent(rankingPanel.transform, false);
+            var rankTitleTMP = rankTitleGO.AddComponent<TextMeshProUGUI>();
+            rankTitleTMP.text = "RANKING";
+            rankTitleTMP.fontSize = 60;
+            rankTitleTMP.fontStyle = FontStyles.Bold;
+            rankTitleTMP.alignment = TextAlignmentOptions.Center;
+            rankTitleTMP.color = new Color(1f, 0.85f, 0.2f);
+            SetAnchor(rankTitleGO, 0.1f, 0.82f, 0.9f, 0.97f);
+
+            var noEntriesGO = new GameObject("NoEntries");
+            noEntriesGO.transform.SetParent(rankingPanel.transform, false);
+            var noEntriesTMP = noEntriesGO.AddComponent<TextMeshProUGUI>();
+            noEntriesTMP.text = "Aún no hay puntuaciones. ¡Sé el primero!";
+            noEntriesTMP.fontSize = 28;
+            noEntriesTMP.alignment = TextAlignmentOptions.Center;
+            noEntriesTMP.color = new Color(0.6f, 0.6f, 0.6f);
+            SetAnchor(noEntriesGO, 0.1f, 0.45f, 0.9f, 0.58f);
+
+            var listContainerGO = new GameObject("RankingList");
+            listContainerGO.transform.SetParent(rankingPanel.transform, false);
+            listContainerGO.AddComponent<Image>().color = new Color(0, 0, 0, 0);
+            var listRT = listContainerGO.GetComponent<RectTransform>();
+            listRT.anchorMin = new Vector2(0.15f, 0.12f);
+            listRT.anchorMax = new Vector2(0.85f, 0.80f);
+            listRT.offsetMin = listRT.offsetMax = Vector2.zero;
+            var vertLayout = listContainerGO.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
+            vertLayout.spacing = 6;
+            vertLayout.childForceExpandWidth = true;
+            vertLayout.childForceExpandHeight = false;
+
+            var rankBackBtn = MakeButton(rankingPanel, "← VOLVER",
+                new Color(0.2f, 0.2f, 0.3f), Color.white, 24,
+                new Vector2(0.35f, 0.02f), new Vector2(0.65f, 0.10f));
+            rankBackBtn.GetComponent<Button>().onClick.AddListener(() =>
+            {
+                rankingPanel.SetActive(false);
+                mainPanel.SetActive(true);
+            });
+
+            // ── Wire MainMenuUI references ────────────────────────────────
+            var soMenu = new SerializedObject(mainMenuUI);
+            soMenu.FindProperty("_playButton").objectReferenceValue      = playBtn.GetComponent<Button>();
+            soMenu.FindProperty("_rankingButton").objectReferenceValue   = rankBtn.GetComponent<Button>();
+            soMenu.FindProperty("_quitButton").objectReferenceValue      = quitBtn.GetComponent<Button>();
+            soMenu.FindProperty("_playerNameInput").objectReferenceValue = nameInput;
+            soMenu.FindProperty("_mainPanel").objectReferenceValue       = mainPanel;
+            soMenu.FindProperty("_rankingPanel").objectReferenceValue    = rankingPanel;
+            soMenu.FindProperty("_highScoreText").objectReferenceValue   = hsTMP;
+            soMenu.FindProperty("_versionText").objectReferenceValue     = verTMP;
+            soMenu.ApplyModifiedProperties();
+
+            // ── Wire RankingUI references ─────────────────────────────────
+            var rankingEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/_Project/Prefabs/UI/RankingEntry.prefab");
+            var soRank = new SerializedObject(rankUI);
+            soRank.FindProperty("_rankingListContainer").objectReferenceValue = listContainerGO.transform;
+            soRank.FindProperty("_rankingPanel").objectReferenceValue         = rankingPanel;
+            soRank.FindProperty("_rankingTitleText").objectReferenceValue     = rankTitleTMP;
+            soRank.FindProperty("_noEntriesText").objectReferenceValue        = noEntriesTMP;
+            if (rankingEntryPrefab != null)
+                soRank.FindProperty("_rankingEntryPrefab").objectReferenceValue = rankingEntryPrefab;
+            soRank.ApplyModifiedProperties();
 
             // Guardar escena
             string path = SCENES_PATH + "/MainMenu.unity";

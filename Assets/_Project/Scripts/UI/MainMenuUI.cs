@@ -209,7 +209,7 @@ namespace BIT.UI
             else
             {
                 // Si no hay GameManager, cargamos la escena directamente
-                UnityEngine.SceneManagement.SceneManager.LoadScene("Game");
+                UnityEngine.SceneManagement.SceneManager.LoadScene("gamesetupscene");
             }
 
             Debug.Log($"[MainMenuUI] Iniciando juego con nombre: {playerName}");
