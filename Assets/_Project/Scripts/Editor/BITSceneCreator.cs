@@ -7,6 +7,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 using BIT.Core;
+using BIT.Events;
 using BIT.UI;
 using BIT.Audio;
 
@@ -410,13 +411,27 @@ namespace BIT.Editor
                     prop.objectReferenceValue = clip;
                     wired++;
                 }
+                // Conectar GameEventSO si existen los assets
+                var gameEvents = new Dictionary<string, string>
+                {
+                    { "_onPlayerDamageEvent", "Assets/_Project/SO_Data/Events/OnPlayerDamage.asset" },
+                    { "_onPlayerAttackEvent", "Assets/_Project/SO_Data/Events/OnPlayerAttack.asset" },
+                    { "_onPickupEvent",       "Assets/_Project/SO_Data/Events/OnPickup.asset"       },
+                };
+                foreach (var kv in gameEvents)
+                {
+                    var prop = so.FindProperty(kv.Key);
+                    if (prop == null || prop.objectReferenceValue != null) continue;
+                    var asset = AssetDatabase.LoadAssetAtPath<BIT.Events.GameEventSO>(kv.Value);
+                    if (asset != null) { prop.objectReferenceValue = asset; wired++; }
+                }
+
                 so.ApplyModifiedProperties();
                 EditorUtility.SetDirty(audioMgr);
-                Debug.Log($"[BITSceneCreator] {wired} clips de audio conectados al AudioManager.");
+                Debug.Log($"[BITSceneCreator] {wired} clips/eventos conectados al AudioManager.");
             }
             else
             {
-                // Si no hay AudioManager en escena, guardar los clips en un config temporal
                 Debug.LogWarning("[BITSceneCreator] AudioManager no está en la escena activa. " +
                     "Abre la escena de juego y ejecuta 'BIT → 4. Conectar Audio' de nuevo.");
             }

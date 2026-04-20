@@ -362,6 +362,7 @@ namespace BIT.Editor
             FixPlayerPrefab();
             FixPickupPrefab<HealthPickup>(PREFABS + "/Pickups/Heart.prefab",   "Heart",   new Color(1f, 0.2f, 0.2f));
             FixPickupPrefab<ScorePickup> (PREFABS + "/Pickups/Coin.prefab",    "Coin",    new Color(1f, 0.85f, 0.1f));
+            CreateSpeedPickupPrefab();
         }
 
         static void FixPlayerPrefab()
@@ -373,44 +374,101 @@ namespace BIT.Editor
             using (var scope = new PrefabUtility.EditPrefabContentsScope(path))
             {
                 var root = scope.prefabContentsRoot;
+                var pc   = root.GetComponent<BIT.Player.PlayerController>();
 
-                // Ya tiene OrbitWeapon?
-                if (root.GetComponentInChildren<BIT.Player.OrbitWeapon>() != null) return;
-
-                // Crear GO hijo "Weapon"
-                var weaponGO = new GameObject("Weapon");
-                weaponGO.transform.SetParent(root.transform, false);
-                weaponGO.transform.localPosition = new Vector3(0.8f, 0f, 0f);
-
-                // SpriteRenderer con sprite de espada del pack si existe
-                var sr = weaponGO.AddComponent<SpriteRenderer>();
-                sr.sortingOrder = 5;
-                string swordPath = "Assets/_Project/Sprites/Ninja Adventure/Actor/Weapon/Sword/SpriteSheet.png";
-                var swordSprite = AssetDatabase.LoadAssetAtPath<Sprite>(swordPath);
-                if (swordSprite == null)
+                // ── OrbitWeapon ───────────────────────────────────────────
+                if (root.GetComponentInChildren<OrbitWeapon>() == null)
                 {
-                    var allSprites = AssetDatabase.LoadAllAssetsAtPath(swordPath);
-                    foreach (var a in allSprites) if (a is Sprite s) { swordSprite = s; break; }
+                    var weaponGO = new GameObject("Weapon");
+                    weaponGO.transform.SetParent(root.transform, false);
+                    weaponGO.transform.localPosition = new Vector3(0.8f, 0f, 0f);
+
+                    var sr = weaponGO.AddComponent<SpriteRenderer>();
+                    sr.sortingOrder = 5;
+                    var swordSprite = LoadFirstSprite(
+                        "Assets/_Project/Sprites/Ninja Adventure/Actor/Weapon/Sword/SpriteSheet.png");
+                    if (swordSprite != null) sr.sprite = swordSprite;
+
+                    var col = weaponGO.AddComponent<CircleCollider2D>();
+                    col.isTrigger = true;
+                    col.radius = 0.25f;
+
+                    var ow   = weaponGO.AddComponent<OrbitWeapon>();
+                    var soOW = new SerializedObject(ow);
+                    soOW.FindProperty("_orbitRadius").floatValue    = 0.8f;
+                    soOW.FindProperty("_rotationSpeed").floatValue  = 15f;
+                    soOW.FindProperty("_damage").intValue           = 10;
+                    soOW.FindProperty("_weaponSprite").objectReferenceValue = sr;
+                    soOW.ApplyModifiedProperties();
+
+                    Debug.Log("[BITFullSetup] OrbitWeapon añadido al Player.prefab.");
                 }
-                if (swordSprite != null) sr.sprite = swordSprite;
 
-                // CircleCollider2D trigger para daño al contacto
-                var col = weaponGO.AddComponent<CircleCollider2D>();
-                col.isTrigger = true;
-                col.radius = 0.25f;
+                // ── FirePoint + Projectile ────────────────────────────────
+                if (pc != null && pc.projectilePrefab == null)
+                {
+                    var shurikenPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                        PREFABS + "/Projectiles/Shuriken.prefab");
+                    if (shurikenPrefab != null)
+                    {
+                        // Crear FirePoint hijo
+                        var fpGO = root.transform.Find("FirePoint")?.gameObject;
+                        if (fpGO == null)
+                        {
+                            fpGO = new GameObject("FirePoint");
+                            fpGO.transform.SetParent(root.transform, false);
+                            fpGO.transform.localPosition = new Vector3(0.5f, 0f, 0f);
+                        }
 
-                // OrbitWeapon component
-                var ow = weaponGO.AddComponent<BIT.Player.OrbitWeapon>();
-                var soOW = new SerializedObject(ow);
-                soOW.FindProperty("_orbitRadius").floatValue = 0.8f;
-                soOW.FindProperty("_rotationSpeed").floatValue = 15f;
-                soOW.FindProperty("_damage").intValue = 10;
-                var sprProp = soOW.FindProperty("_weaponSprite");
-                if (sprProp != null) sprProp.objectReferenceValue = sr;
-                soOW.ApplyModifiedProperties();
+                        var soPC = new SerializedObject(pc);
+                        soPC.FindProperty("projectilePrefab").objectReferenceValue = shurikenPrefab;
+                        soPC.FindProperty("firePoint").objectReferenceValue        = fpGO.transform;
+                        soPC.ApplyModifiedProperties();
+
+                        Debug.Log("[BITFullSetup] Shuriken + FirePoint conectados al Player.prefab.");
+                    }
+                }
             }
+        }
 
-            Debug.Log("[BITFullSetup] OrbitWeapon añadido al Player.prefab.");
+        static Sprite LoadFirstSprite(string path)
+        {
+            var sp = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sp != null) return sp;
+            foreach (var a in AssetDatabase.LoadAllAssetsAtPath(path))
+                if (a is Sprite s) return s;
+            return null;
+        }
+
+        static void CreateSpeedPickupPrefab()
+        {
+            string path = PREFABS + "/Pickups/SpeedBoost.prefab";
+            if (File.Exists(path)) return;
+
+            var go = new GameObject("SpeedBoost");
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.color = new Color(0.3f, 0.8f, 1f);
+            sr.sortingOrder = 1;
+
+            // Intentar usar sprite del pack (lightning/FX)
+            var sp = LoadFirstSprite(FX_ROOT + "/Thunder/SpriteSheet.png");
+            if (sp != null) sr.sprite = sp;
+
+            var col = go.AddComponent<CircleCollider2D>();
+            col.isTrigger = true;
+            col.radius = 0.3f;
+
+            var pickup = go.AddComponent<SpeedPickup>();
+            var so = new SerializedObject(pickup);
+            so.FindProperty("_speedMultiplier").floatValue = 1.5f;
+            so.FindProperty("_duration").floatValue        = 5f;
+            so.FindProperty("_floatAnimation").boolValue   = true;
+            so.ApplyModifiedProperties();
+
+            PrefabUtility.SaveAsPrefabAsset(go, path);
+            Object.DestroyImmediate(go);
+
+            Debug.Log("[BITFullSetup] SpeedBoost.prefab creado.");
         }
 
         static void FixPickupPrefab<T>(string path, string name, Color color)
