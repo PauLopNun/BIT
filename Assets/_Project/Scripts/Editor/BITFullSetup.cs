@@ -695,6 +695,8 @@ namespace BIT.Editor
             using (var scope = new PrefabUtility.EditPrefabContentsScope(path))
             {
                 var root = scope.prefabContentsRoot;
+                // Eliminar scripts con referencias rotas antes de añadir el nuevo
+                GameObjectUtility.RemoveMonoBehavioursWithMissingScript(root);
                 if (root.GetComponent<T>() != null) return;
 
                 root.AddComponent<T>();

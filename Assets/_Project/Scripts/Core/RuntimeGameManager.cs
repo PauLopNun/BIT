@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using BIT.Data;
 
 // ============================================================================
 // RUNTIMEGAMEMANAGER.CS - Gestiona UI y Audio en tiempo de ejecucion
@@ -260,6 +261,44 @@ namespace BIT.Core
             waveMsgRT.sizeDelta = new Vector2(0, 80);
             _waveMessageGO.SetActive(false);
 
+            // Indicador del ninja elegido (debajo del top panel, izquierda)
+            var csm = CharacterSelectManager.Instance;
+            if (csm?.SelectedCharacter != null)
+            {
+                var cd = csm.SelectedCharacter;
+                var ninjaGO = new GameObject("NinjaIndicator");
+                ninjaGO.transform.SetParent(_canvas.transform, false);
+                var ninjaText = ninjaGO.AddComponent<Text>();
+                ninjaText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                ninjaText.text = $"[ {cd.characterName} ]";
+                ninjaText.fontSize = 16;
+                ninjaText.fontStyle = FontStyle.Bold;
+                ninjaText.color = cd.spriteColor;
+                ninjaText.alignment = TextAnchor.UpperLeft;
+                var ninjaRT = ninjaGO.GetComponent<RectTransform>();
+                ninjaRT.anchorMin = new Vector2(0f, 1f);
+                ninjaRT.anchorMax = new Vector2(0f, 1f);
+                ninjaRT.pivot = new Vector2(0f, 1f);
+                ninjaRT.anchoredPosition = new Vector2(12f, -82f);
+                ninjaRT.sizeDelta = new Vector2(200f, 22f);
+            }
+
+            // Panel de controles (esquina inferior izquierda)
+            var ctrlGO = new GameObject("ControlsHint");
+            ctrlGO.transform.SetParent(_canvas.transform, false);
+            var ctrlText = ctrlGO.AddComponent<Text>();
+            ctrlText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            ctrlText.fontSize = 14;
+            ctrlText.color = new Color(0.85f, 0.85f, 0.85f, 0.75f);
+            ctrlText.alignment = TextAnchor.LowerLeft;
+            ctrlText.text = "WASD  Mover\nClick/Esp  Atacar\nShift/RMB  Dash (x2 dmg)\nE  Interactuar\nEsc  Pausa";
+            var ctrlRT = ctrlGO.GetComponent<RectTransform>();
+            ctrlRT.anchorMin = new Vector2(0f, 0f);
+            ctrlRT.anchorMax = new Vector2(0f, 0f);
+            ctrlRT.pivot = new Vector2(0f, 0f);
+            ctrlRT.anchoredPosition = new Vector2(10f, 10f);
+            ctrlRT.sizeDelta = new Vector2(200f, 90f);
+
             Debug.Log("[RuntimeGameManager] UI creada");
         }
 
@@ -494,6 +533,7 @@ namespace BIT.Core
 
         void UpdateUI()
         {
+            if (_hearts == null) return;
             // Actualizar corazones
             float healthPerHeart = (float)_maxHealth / maxHearts;
             for (int i = 0; i < _hearts.Length; i++)
@@ -617,20 +657,22 @@ namespace BIT.Core
 
         IEnumerator DamageFlash()
         {
-            // Flash rojo en la pantalla
-            GameObject flashGO = new GameObject("DamageFlash");
+            var flashGO = new GameObject("DamageFlash");
             flashGO.transform.SetParent(_canvas.transform, false);
-
-            Image flash = flashGO.AddComponent<Image>();
-            flash.color = new Color(1, 0, 0, 0.3f);
-
-            RectTransform rect = flashGO.GetComponent<RectTransform>();
+            var flash = flashGO.AddComponent<Image>();
+            var rect = flashGO.GetComponent<RectTransform>();
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
 
-            yield return new WaitForSeconds(0.1f);
+            float duration = 0.40f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                flash.color = new Color(1f, 0f, 0f, Mathf.Lerp(0.45f, 0f, elapsed / duration));
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
             Destroy(flashGO);
         }
 

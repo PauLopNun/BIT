@@ -260,10 +260,10 @@ namespace BIT.UI
 
             // Barras de estadísticas
             float barY = 0.375f;
-            AddStatBar(innerGO, "❤ Vida",  NormalizeHealth(data.maxHealth),  data.spriteColor, ref barY);
-            AddStatBar(innerGO, "⚡ Veloc", NormalizeSpeed(data.moveSpeed),   data.spriteColor, ref barY);
-            AddStatBar(innerGO, "⚔ Daño",  NormalizeDamage(data.meleeDamage),data.spriteColor, ref barY);
-            AddStatBar(innerGO, "💨 Dash",  NormalizeDash(data.dashCooldown), data.spriteColor, ref barY);
+            AddStatBar(innerGO, "HP",   NormalizeHealth(data.maxHealth),   data.spriteColor, ref barY);
+            AddStatBar(innerGO, "SPD",  NormalizeSpeed(data.moveSpeed),    data.spriteColor, ref barY);
+            AddStatBar(innerGO, "DMG",  NormalizeDamage(data.meleeDamage), data.spriteColor, ref barY);
+            AddStatBar(innerGO, "DASH", NormalizeDash(data.dashCooldown),  data.spriteColor, ref barY);
 
             // Botón ELEGIR
             var selGO = BuildButton(innerGO, "ELEGIR", new Color(0.2f, 0.2f, 0.3f),
