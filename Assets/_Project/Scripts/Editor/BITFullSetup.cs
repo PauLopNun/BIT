@@ -689,24 +689,28 @@ namespace BIT.Editor
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (prefab == null) { Debug.LogWarning($"[BITFullSetup] {name}.prefab no encontrado: {path}"); return; }
 
-            // Ya tiene el componente?
-            if (prefab.GetComponent<T>() != null) return;
-
             using (var scope = new PrefabUtility.EditPrefabContentsScope(path))
             {
                 var root = scope.prefabContentsRoot;
-                // Eliminar scripts con referencias rotas antes de añadir el nuevo
-                GameObjectUtility.RemoveMonoBehavioursWithMissingScript(root);
-                if (root.GetComponent<T>() != null) return;
 
-                root.AddComponent<T>();
+                // Remove broken script references from root and all children
+                RemoveMissingScriptsRecursive(root);
 
-                // Asegurar SpriteRenderer visible
+                if (root.GetComponent<T>() == null)
+                    root.AddComponent<T>();
+
                 var sr = root.GetComponent<SpriteRenderer>();
                 if (sr != null) sr.color = color;
             }
 
-            Debug.Log($"[BITFullSetup] {typeof(T).Name} añadido a {name}.prefab.");
+            Debug.Log($"[BITFullSetup] {name}.prefab arreglado ({typeof(T).Name}).");
+        }
+
+        static void RemoveMissingScriptsRecursive(GameObject go)
+        {
+            GameObjectUtility.RemoveMonoBehavioursWithMissingScript(go);
+            foreach (Transform child in go.transform)
+                RemoveMissingScriptsRecursive(child.gameObject);
         }
 
         // ====================================================================
