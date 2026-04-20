@@ -61,7 +61,7 @@ namespace BIT.Core
         [SerializeField] private string _mainMenuScene = "MainMenu";
 
         [Tooltip("Nombre de la escena del juego")]
-        [SerializeField] private string _gameScene = "Game";
+        [SerializeField] private string _gameScene = "gamesetupscene";
 
         [Header("=== CONFIGURACIÓN DE JUEGO ===")]
         [Tooltip("Tiempo de escala cuando está pausado (0 = congelado)")]

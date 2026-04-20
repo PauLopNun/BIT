@@ -21,6 +21,9 @@ namespace BIT.Data
         [Tooltip("Color que se aplica al SpriteRenderer del jugador")]
         public Color spriteColor = Color.white;
 
+        [Tooltip("Ruta al SpriteSheet del personaje (Assets/_Project/Sprites/...)")]
+        public string spritePath = "";
+
         [Header("=== COMBATE ===")]
         [Tooltip("Vida máxima")]
         public int maxHealth = 100;
