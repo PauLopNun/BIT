@@ -60,6 +60,11 @@ namespace BIT.Core
         private Vector2 _moveDirection;
         private bool _isDead = false;
 
+        private float _strafeTimer;
+        private float _strafeFrequency;
+        private float _strafeAmplitude;
+        private float _speedVariance;
+
         // Hash de parámetros del animator para optimización
         private static readonly int ANIM_SPEED = Animator.StringToHash("Speed");
         private static readonly int ANIM_MOVEX = Animator.StringToHash("MoveX");
@@ -85,6 +90,12 @@ namespace BIT.Core
         {
             _currentHealth = maxHealth;
             FindPlayer();
+
+            // Each enemy gets a unique strafe pattern so they don't all move identically
+            _strafeTimer = Random.Range(0f, Mathf.PI * 2f);
+            _strafeFrequency = Random.Range(0.6f, 1.4f);
+            _strafeAmplitude = Random.Range(0.25f, 0.55f);
+            _speedVariance   = Random.Range(0.85f, 1.15f);
 
             // El RuntimeGameManager cuenta enemigos automáticamente en CountEnemies()
             // No necesitamos registrar manualmente
@@ -161,11 +172,15 @@ namespace BIT.Core
             // Si el jugador está en rango de detección y no demasiado cerca
             if (distance < detectionRange && distance > stoppingDistance)
             {
-                // Calcular dirección hacia el jugador
                 _moveDirection = ((Vector2)_player.position - (Vector2)transform.position).normalized;
 
-                // Moverse hacia el jugador
-                _rb.linearVelocity = _moveDirection * moveSpeed;
+                // Perpendicular zigzag so enemies don't all rush in a straight line
+                _strafeTimer += Time.fixedDeltaTime;
+                Vector2 perp = new Vector2(-_moveDirection.y, _moveDirection.x);
+                float strafe = Mathf.Sin(_strafeTimer * _strafeFrequency * Mathf.PI * 2f) * _strafeAmplitude;
+                Vector2 finalDir = (_moveDirection + perp * strafe).normalized;
+
+                _rb.linearVelocity = finalDir * (moveSpeed * _speedVariance);
             }
             else
             {
