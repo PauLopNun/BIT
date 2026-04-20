@@ -309,7 +309,8 @@ namespace BIT.Enemy
 
             _rb.linearVelocity = Vector2.zero;
             if (_hpBarRoot != null) Destroy(_hpBarRoot);
-            GetComponent<Collider2D>().enabled = false;
+            var col = GetComponent<Collider2D>();
+            if (col != null) col.enabled = false;
             Destroy(gameObject, 0.5f);
         }
 

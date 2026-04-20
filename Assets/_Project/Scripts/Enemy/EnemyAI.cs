@@ -505,7 +505,8 @@ namespace BIT.Enemy
             _animator?.SetTrigger(ANIM_DIE);
 
             _rb.linearVelocity = Vector2.zero;
-            GetComponent<Collider2D>().enabled = false;
+            var col = GetComponent<Collider2D>();
+            if (col != null) col.enabled = false;
 
             Destroy(gameObject, 1f);
         }
