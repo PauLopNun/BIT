@@ -67,26 +67,30 @@ namespace BIT.UI
                     "Ninja Azul", "Equilibrado — Bueno en todo.",
                     new Color(0.35f, 0.65f, 1f),
                     maxHealth: 100, speed: 5f, damage: 15, cooldown: 0.3f,
-                    dashSpeed: 18f, dashDur: 0.18f, dashCD: 3f),
+                    dashSpeed: 18f, dashDur: 0.18f, dashCD: 3f,
+                    spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaBlue/SeparateAnim/Idle.png"),
 
                 MakeCharacter(
                     "Ninja Rojo", "Guerrero — Alto daño, más lento.",
                     new Color(1f, 0.25f, 0.25f),
                     maxHealth: 80, speed: 3.5f, damage: 28, cooldown: 0.5f,
-                    dashSpeed: 22f, dashDur: 0.22f, dashCD: 4f),
+                    dashSpeed: 22f, dashDur: 0.22f, dashCD: 4f,
+                    spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaRed/SeparateAnim/Idle.png"),
 
                 MakeCharacter(
                     "Ninja Verde", "Explorador — Rápido, más resistente.",
                     new Color(0.2f, 0.9f, 0.4f),
                     maxHealth: 140, speed: 7f, damage: 10, cooldown: 0.22f,
-                    dashSpeed: 24f, dashDur: 0.15f, dashCD: 2f),
+                    dashSpeed: 24f, dashDur: 0.15f, dashCD: 2f,
+                    spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaGreen/SeparateAnim/Idle.png"),
             };
         }
 
         static CharacterData MakeCharacter(
             string name, string desc, Color color,
             int maxHealth, float speed, int damage, float cooldown,
-            float dashSpeed, float dashDur, float dashCD)
+            float dashSpeed, float dashDur, float dashCD,
+            string spritePath = "")
         {
             var d = ScriptableObject.CreateInstance<CharacterData>();
             d.characterName = name;
@@ -100,6 +104,7 @@ namespace BIT.UI
             d.dashSpeed     = dashSpeed;
             d.dashDuration  = dashDur;
             d.dashCooldown  = dashCD;
+            d.spritePath    = spritePath;
             return d;
         }
 
@@ -212,23 +217,34 @@ namespace BIT.UI
             innerRT.offsetMin = new Vector2(3, 3);
             innerRT.offsetMax = new Vector2(-3, -3);
 
-            // "Avatar": rectángulo de color del personaje
-            var avatarGO = MakeImage(innerGO, "Avatar", data.spriteColor);
+            // "Avatar": sprite real del personaje o fallback de color
+            var avatarGO = MakeImage(innerGO, "Avatar", new Color(0.08f, 0.06f, 0.12f));
             var avatarRT = avatarGO.GetComponent<RectTransform>();
             avatarRT.anchorMin = new Vector2(0.15f, 0.55f);
             avatarRT.anchorMax = new Vector2(0.85f, 0.95f);
             avatarRT.offsetMin = avatarRT.offsetMax = Vector2.zero;
 
-            // Inicial del personaje en el avatar
-            var initGO = new GameObject("Initial");
-            initGO.transform.SetParent(avatarGO.transform, false);
-            var initTMP = initGO.AddComponent<TextMeshProUGUI>();
-            initTMP.text = data.characterName[0].ToString();
-            initTMP.fontSize = 72;
-            initTMP.fontStyle = FontStyles.Bold;
-            initTMP.alignment = TextAlignmentOptions.Center;
-            initTMP.color = new Color(0f, 0f, 0f, 0.5f);
-            StretchFull(initGO.GetComponent<RectTransform>());
+            Sprite characterSprite = TryLoadSprite(data.spritePath);
+            if (characterSprite != null)
+            {
+                var sprImg = avatarGO.GetComponent<Image>();
+                sprImg.sprite = characterSprite;
+                sprImg.color = data.spriteColor;
+                sprImg.preserveAspect = true;
+            }
+            else
+            {
+                avatarGO.GetComponent<Image>().color = data.spriteColor;
+                var initGO = new GameObject("Initial");
+                initGO.transform.SetParent(avatarGO.transform, false);
+                var initTMP = initGO.AddComponent<TextMeshProUGUI>();
+                initTMP.text = data.characterName[0].ToString();
+                initTMP.fontSize = 72;
+                initTMP.fontStyle = FontStyles.Bold;
+                initTMP.alignment = TextAlignmentOptions.Center;
+                initTMP.color = new Color(0f, 0f, 0f, 0.5f);
+                StretchFull(initGO.GetComponent<RectTransform>());
+            }
 
             // Nombre del personaje
             AddText(innerGO, "Name", data.characterName, 22, FontStyles.Bold, data.spriteColor,
@@ -414,6 +430,19 @@ namespace BIT.UI
         {
             var tmp = btnGO.GetComponentInChildren<TextMeshProUGUI>();
             if (tmp != null) { tmp.color = color; tmp.fontSize = size; }
+        }
+
+        static Sprite TryLoadSprite(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+#if UNITY_EDITOR
+            var sprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path);
+            foreach (var a in sprites)
+                if (a is Sprite s) return s;
+            var tex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (tex != null) return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+#endif
+            return null;
         }
     }
 }

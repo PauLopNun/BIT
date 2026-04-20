@@ -668,7 +668,19 @@ namespace BIT.Player
             dashCooldown    = data.dashCooldown;
 
             if (spriteRenderer != null)
+            {
                 spriteRenderer.color = data.spriteColor;
+#if UNITY_EDITOR
+                if (!string.IsNullOrEmpty(data.spritePath))
+                {
+                    var sprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(data.spritePath);
+                    foreach (var a in sprites)
+                    {
+                        if (a is Sprite s) { spriteRenderer.sprite = s; break; }
+                    }
+                }
+#endif
+            }
 
             // Actualizar UI con la nueva vida máxima
             if (BIT.Core.RuntimeGameManager.Instance != null)
