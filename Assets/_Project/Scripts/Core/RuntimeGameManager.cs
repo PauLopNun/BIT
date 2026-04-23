@@ -291,7 +291,7 @@ namespace BIT.Core
             ctrlText.fontSize = 14;
             ctrlText.color = new Color(0.85f, 0.85f, 0.85f, 0.75f);
             ctrlText.alignment = TextAnchor.LowerLeft;
-            ctrlText.text = "WASD  Mover\nClick/Esp  Atacar\nShift/RMB  Dash (x2 dmg)\nE  Interactuar\nEsc  Pausa";
+            ctrlText.text = "WASD  Mover\nLMB  Melee\nRMB  Shuriken\nShift  Dash (x2 dmg)\nE  Interactuar";
             var ctrlRT = ctrlGO.GetComponent<RectTransform>();
             ctrlRT.anchorMin = new Vector2(0f, 0f);
             ctrlRT.anchorMax = new Vector2(0f, 0f);
@@ -723,8 +723,7 @@ namespace BIT.Core
         {
             yield return new WaitForSeconds(delay);
             Time.timeScale = 1f;
-            UnityEngine.SceneManagement.SceneManager.LoadScene(
-                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+            UnityEngine.SceneManagement.SceneManager.LoadScene("gamesetupscene");
         }
 
         void Victory()
@@ -761,24 +760,8 @@ namespace BIT.Core
 
         void RestartGame()
         {
-            _isGameOver = false;
-            _isVictory = false;
-            _currentHealth = _maxHealth;
-            _score = 0;
-            _enemiesKilled = 0;
-
-            if (_gameOverPanel != null) _gameOverPanel.SetActive(false);
-            if (_victoryPanel != null) _victoryPanel.SetActive(false);
-
-            UpdateUI();
-
-            if (_musicSource != null)
-                _musicSource.UnPause();
-
-            // Recargar escena
-            UnityEngine.SceneManagement.SceneManager.LoadScene(
-                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
-            );
+            Time.timeScale = 1f;
+            UnityEngine.SceneManagement.SceneManager.LoadScene("gamesetupscene");
         }
 
         // ====================================================================

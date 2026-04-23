@@ -67,7 +67,15 @@ namespace BIT.Player
         [Tooltip("Puntuación")]
         public int score = 0;
 
-        [Header("=== DASH (segundo ataque) ===")]
+        [Header("=== SHURIKEN (Clic Derecho) ===")]
+        [Tooltip("Daño del shuriken manual")]
+        public int shurikenDamage = 20;
+        [Tooltip("Velocidad del shuriken lanzado")]
+        public float shurikenSpeed = 14f;
+        [Tooltip("Cooldown entre shurikens manuales (segundos)")]
+        public float shurikenCooldown = 0.45f;
+
+        [Header("=== DASH (Shift) ===")]
         [Tooltip("Velocidad durante el dash")]
         public float dashSpeed = 18f;
 
@@ -231,15 +239,21 @@ namespace BIT.Player
             UpdateSpriteDirection();
 
             // --------------------------------------------------------
-            // DASH ATTACK — Shift o botón secundario
+            // DASH ATTACK — solo Shift
             // --------------------------------------------------------
-            if (_dashCooldownTimer > 0f) _dashCooldownTimer -= Time.deltaTime;
+            if (_dashCooldownTimer  > 0f) _dashCooldownTimer  -= Time.deltaTime;
+            if (_shurikenCooldownTimer > 0f) _shurikenCooldownTimer -= Time.deltaTime;
 
-            bool dashInput = (Keyboard.current != null && Keyboard.current.shiftKey.wasPressedThisFrame)
-                          || (Mouse.current   != null && Mouse.current.rightButton.wasPressedThisFrame);
-
-            if (!_isDashing && _dashCooldownTimer <= 0f && canMove && dashInput)
+            if (!_isDashing && _dashCooldownTimer <= 0f && canMove
+                && Keyboard.current != null && Keyboard.current.shiftKey.wasPressedThisFrame)
                 StartCoroutine(DashAttack());
+
+            // --------------------------------------------------------
+            // SHURIKEN — Clic derecho
+            // --------------------------------------------------------
+            if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame
+                && _shurikenCooldownTimer <= 0f && canMove && !_isDashing)
+                ThrowShuriken();
         }
 
         // ====================================================================
@@ -328,10 +342,10 @@ namespace BIT.Player
             // Posición del ataque (delante del jugador)
             Vector3 attackPos = transform.position + (Vector3)lastMoveDirection * 0.5f;
 
-            // Efecto visual de slash
+            // Efecto visual de espada (barrido en abanico)
             if (BIT.Core.VFXManager.Instance != null)
             {
-                BIT.Core.VFXManager.Instance.SpawnSlash(attackPos, lastMoveDirection);
+                BIT.Core.VFXManager.Instance.SpawnMeleeSwordSwing(transform.position, lastMoveDirection);
             }
 
             // ATAQUE MELEE - Buscar enemigos cercanos y hacerles daño
@@ -536,6 +550,7 @@ namespace BIT.Player
         // Dash state
         private bool _isDashing;
         private float _dashCooldownTimer;
+        private float _shurikenCooldownTimer;
 
         /// <summary>
         /// Modifica la velocidad temporalmente (power-up o trampa de lentitud)
@@ -577,9 +592,66 @@ namespace BIT.Player
         }
 
         // ====================================================================
+        // SHURIKEN MANUAL — Clic derecho
+        // ====================================================================
+
+        void ThrowShuriken()
+        {
+            _shurikenCooldownTimer = shurikenCooldown;
+
+            if (Mouse.current == null || Camera.main == null) return;
+
+            Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
+            Vector3 mouseWorldPos  = Camera.main.ScreenToWorldPoint(
+                new Vector3(mouseScreenPos.x, mouseScreenPos.y, 0f));
+            mouseWorldPos.z = 0f;
+            Vector2 dir = ((Vector2)mouseWorldPos - (Vector2)transform.position).normalized;
+
+            var bulletGO = new GameObject("Shuriken");
+            bulletGO.transform.position = transform.position + (Vector3)dir * 0.45f;
+            bulletGO.tag = "Projectile";
+
+            // Sprite de shuriken: diamante giratorio
+            var tex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
+            var pixels = new Color[256];
+            for (int i = 0; i < 256; i++)
+            {
+                int x = i % 16, y = i / 16;
+                float dx = Mathf.Abs(x - 7.5f), dy = Mathf.Abs(y - 7.5f);
+                pixels[i] = (dx + dy <= 5.5f) ? Color.white : Color.clear;
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+
+            var sr = bulletGO.AddComponent<SpriteRenderer>();
+            sr.sprite = Sprite.Create(tex, new Rect(0, 0, 16, 16), Vector2.one * 0.5f, 16f);
+            sr.color  = new Color(0.75f, 0.85f, 1f);
+            sr.sortingOrder = 4;
+            bulletGO.transform.localScale = Vector3.one * 0.3f;
+
+            var rb = bulletGO.AddComponent<Rigidbody2D>();
+            rb.gravityScale = 0f;
+            rb.freezeRotation = false;
+            rb.linearVelocity  = dir * shurikenSpeed;
+            rb.angularVelocity = 480f;
+
+            var col = bulletGO.AddComponent<CircleCollider2D>();
+            col.isTrigger = true;
+            col.radius    = 0.5f;
+
+            var bullet = bulletGO.AddComponent<PlayerBullet>();
+            bullet.damage = shurikenDamage;
+
+            Destroy(bulletGO, 4f);
+
+            if (BIT.Core.RuntimeGameManager.Instance != null)
+                BIT.Core.RuntimeGameManager.Instance.PlayAttackSound();
+        }
+
+        // ====================================================================
         // DASH ATTACK — segundo tipo de ataque
         // ====================================================================
-        // Shift / Clic derecho: dash en la dirección de movimiento.
+        // Shift: dash en la dirección de movimiento.
         // Durante el dash el jugador es invulnerable y daña al doble.
         // Cooldown: 3 segundos (configurable por personaje).
 

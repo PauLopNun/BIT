@@ -70,9 +70,65 @@ namespace BIT.Core
             }
             else
             {
-                // Crear efecto simple si no hay prefab
                 StartCoroutine(SimpleSlashEffect(position, direction));
             }
+        }
+
+        /// <summary>
+        /// Arco de espada que barre en abanico — 3 slashes con pequeño delay entre ellos
+        /// </summary>
+        public void SpawnMeleeSwordSwing(Vector3 playerPos, Vector2 direction)
+        {
+            if (!gameObject.activeInHierarchy) return;
+            StartCoroutine(SwordSwingEffect(playerPos, direction));
+        }
+
+        IEnumerator SwordSwingEffect(Vector3 playerPos, Vector2 direction)
+        {
+            float baseAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+            float[] angleOffsets = { -40f, 0f, 40f };
+            float[] scales       = { 1.4f, 2.0f, 1.4f };
+
+            for (int i = 0; i < angleOffsets.Length; i++)
+            {
+                float rad = (baseAngle + angleOffsets[i]) * Mathf.Deg2Rad;
+                Vector3 pos = playerPos + new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f) * 0.7f;
+
+                var go = new GameObject("SwordSlash");
+                go.transform.position = pos;
+                go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle + angleOffsets[i] - 90f);
+                go.transform.localScale = Vector3.one * scales[i];
+
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = CreateSlashSprite();
+                sr.color = new Color(1f, 0.95f, 0.45f);
+                sr.sortingOrder = 25;
+
+                StartCoroutine(AnimateSlashFade(go, 0.25f));
+                yield return new WaitForSeconds(0.045f);
+            }
+        }
+
+        IEnumerator AnimateSlashFade(GameObject go, float duration)
+        {
+            if (go == null) yield break;
+            var sr = go.GetComponent<SpriteRenderer>();
+            if (sr == null) { Destroy(go); yield break; }
+
+            Vector3 startScale = go.transform.localScale;
+            float elapsed = 0f;
+            while (elapsed < duration && go != null)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                if (go != null && sr != null)
+                {
+                    go.transform.localScale = startScale * (1f + t * 0.9f);
+                    sr.color = new Color(1f, 0.95f, 0.45f, 1f - t);
+                }
+                yield return null;
+            }
+            if (go != null) Destroy(go);
         }
 
         /// <summary>

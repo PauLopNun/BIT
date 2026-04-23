@@ -389,6 +389,18 @@ namespace BIT.Core
             }
 
             ScaleEnemyStats(enemy);
+
+            // Ensure prefab-based enemies have item drops configured
+            var dropper = enemy.GetComponent<BIT.Enemy.EnemyDropper>();
+            if (dropper == null)
+            {
+                dropper = enemy.AddComponent<BIT.Enemy.EnemyDropper>();
+                var heartPrefab = LoadPickupPrefab("Heart");
+                var coinPrefab  = LoadPickupPrefab("Coin");
+                if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.12f);
+                if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.45f);
+            }
+
             return enemy;
         }
 
@@ -399,14 +411,22 @@ namespace BIT.Core
             go.tag = "Enemy";
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.color = new Color(0.5f, 0.2f, 1f); // purple to distinguish from melee
             sr.sortingOrder = 2;
 
             // Try to load SkullBlue sprite
             var sprite = LoadFirstAvailableSprite(
                 "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/SkullBlue/SpriteSheet.png",
                 "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Skull/SpriteSheet.png");
-            if (sprite != null) sr.sprite = sprite;
+            if (sprite != null)
+            {
+                sr.sprite = sprite;
+                sr.color = Color.white;
+            }
+            else
+            {
+                // No sprite found — draw a simple skull shape with color
+                sr.color = new Color(0.9f, 0.9f, 0.85f);
+            }
 
             var rb = go.AddComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
@@ -416,7 +436,27 @@ namespace BIT.Core
             col.radius = 0.4f;
 
             go.AddComponent<BIT.Enemy.RangedEnemyAI>();
+
+            // Item drops so ranged enemies feel rewarding to kill
+            var dropper = go.AddComponent<BIT.Enemy.EnemyDropper>();
+            var heartPrefab = LoadPickupPrefab("Heart");
+            var coinPrefab  = LoadPickupPrefab("Coin");
+            if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.18f);
+            if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.50f);
+
             return go;
+        }
+
+        static GameObject LoadPickupPrefab(string name)
+        {
+#if UNITY_EDITOR
+            var guids = UnityEditor.AssetDatabase.FindAssets(
+                $"t:Prefab {name}", new[] { "Assets/_Project/Prefabs/Pickups" });
+            if (guids.Length > 0)
+                return UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                    UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]));
+#endif
+            return null;
         }
 
         static Sprite LoadFirstAvailableSprite(params string[] paths)

@@ -14,11 +14,11 @@ namespace BIT.Enemy
 
         [Header("=== DISPARO ===")]
         public float fireRate = 2.8f;
-        public int projectileDamage = 12;
+        public int projectileDamage = 8;
         public float projectileSpeed = 7f;
 
         [Header("=== STATS ===")]
-        public int maxHealth = 35;
+        public int maxHealth = 18;
         public int scoreValue = 150;
 
         private Transform _player;

@@ -44,5 +44,12 @@ namespace BIT.Enemy
                 Instantiate(entry.prefab, transform.position + (Vector3)offset, Quaternion.identity);
             }
         }
+
+        // Configure drops at runtime (used by WaveManager for spawned enemies)
+        public void AddDrop(GameObject prefab, float probability)
+        {
+            if (prefab == null) return;
+            _drops.Add(new DropEntry { prefab = prefab, probability = probability });
+        }
     }
 }

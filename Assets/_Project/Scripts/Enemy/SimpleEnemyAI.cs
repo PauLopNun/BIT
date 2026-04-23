@@ -35,13 +35,13 @@ namespace BIT.Core
 
         [Header("=== COMBATE ===")]
         [Tooltip("Daño que hace al jugador por contacto")]
-        public int damage = 10;
+        public int damage = 7;
 
         [Tooltip("Cooldown entre ataques (segundos)")]
         public float attackCooldown = 1f;
 
         [Tooltip("Vida máxima del enemigo")]
-        public int maxHealth = 50;
+        public int maxHealth = 25;
 
         [Header("=== PUNTUACIÓN ===")]
         [Tooltip("Puntos que da al morir")]
