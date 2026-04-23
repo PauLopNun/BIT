@@ -99,6 +99,7 @@ namespace BIT.Player
         private Vector2 lastMoveDirection = Vector2.down;
         private float lastAttackTime;
         private bool canMove = true;
+        private bool _isDead = false;
 
         // ====================================================================
         // INICIALIZACIÓN
@@ -359,31 +360,17 @@ namespace BIT.Player
                 // Verificar si es un enemigo
                 if (hit.CompareTag("Enemy"))
                 {
-                    // Intentar hacer daño - primero con SimpleEnemyAI
                     var simpleEnemy = hit.GetComponent<BIT.Core.SimpleEnemyAI>();
-                    if (simpleEnemy != null)
-                    {
-                        simpleEnemy.TakeDamage(meleeDamage);
-                        enemiesHit++;
-                        continue;
-                    }
+                    if (simpleEnemy != null) { simpleEnemy.TakeDamage(meleeDamage); enemiesHit++; continue; }
 
-                    // Fallback a EnemyAI
+                    var rangedEnemy = hit.GetComponent<BIT.Enemy.RangedEnemyAI>();
+                    if (rangedEnemy != null) { rangedEnemy.TakeDamage(meleeDamage); enemiesHit++; continue; }
+
                     var enemyAI = hit.GetComponent<BIT.Enemy.EnemyAI>();
-                    if (enemyAI != null)
-                    {
-                        enemyAI.TakeDamage(meleeDamage);
-                        enemiesHit++;
-                        continue;
-                    }
+                    if (enemyAI != null) { enemyAI.TakeDamage(meleeDamage); enemiesHit++; continue; }
 
-                    // Fallback a IDamageable
                     var damageable = hit.GetComponent<IDamageable>();
-                    if (damageable != null)
-                    {
-                        damageable.TakeDamage(meleeDamage);
-                        enemiesHit++;
-                    }
+                    if (damageable != null) { damageable.TakeDamage(meleeDamage); enemiesHit++; }
                 }
             }
 
@@ -430,6 +417,8 @@ namespace BIT.Player
         /// </summary>
         public void TakeDamage(int damage)
         {
+            if (_isDead) return;
+
             currentHealth -= damage;
             Debug.Log("[Player] Daño recibido: " + damage + ". Vida: " + currentHealth);
 
@@ -493,6 +482,7 @@ namespace BIT.Player
 
         void Die()
         {
+            _isDead = true;
             Debug.Log("[Player] ¡Game Over!");
             canMove = false;
             rb.linearVelocity = Vector2.zero;
@@ -622,6 +612,8 @@ namespace BIT.Player
                     int dashDmg = meleeDamage * 2;
                     var simpleAI = hit.GetComponent<BIT.Core.SimpleEnemyAI>();
                     if (simpleAI != null) { simpleAI.TakeDamage(dashDmg); continue; }
+                    var rangedAI = hit.GetComponent<BIT.Enemy.RangedEnemyAI>();
+                    if (rangedAI != null) { rangedAI.TakeDamage(dashDmg); continue; }
                     var enemyAI = hit.GetComponent<BIT.Enemy.EnemyAI>();
                     if (enemyAI != null) { enemyAI.TakeDamage(dashDmg); continue; }
                     var bossAI = hit.GetComponent<BIT.Enemy.BossEnemyAI>();
