@@ -178,9 +178,9 @@ namespace BIT.Editor
             for (int x = PLAY_LEFT; x <= PLAY_RIGHT; x++)
                 detailTM.SetTile(new Vector3Int(x, PLAY_TOP, 0), safeFace);
 
-            // Cara de la pared SUR (fila y = PLAY_BOTTOM - 1 = -10)
+            // Cara de la pared SUR (fila y = PLAY_BOTTOM = -9, visible desde el área jugable)
             for (int x = PLAY_LEFT; x <= PLAY_RIGHT; x++)
-                detailTM.SetTile(new Vector3Int(x, PLAY_BOTTOM - 1, 0), safeFace);
+                detailTM.SetTile(new Vector3Int(x, PLAY_BOTTOM, 0), safeFace);
 
             // Antorchas a lo largo de los cuatro muros interiores
             PlaceWallElements(detailTM, elem);
@@ -214,11 +214,11 @@ namespace BIT.Editor
             // ── Colisión compuesta ─────────────────────────────────────────
             EditorUtility.DisplayProgressBar("BIT Dungeon", "Configurando colisiones…", 0.85f);
 
+            var rb = wallsTM.gameObject.AddComponent<Rigidbody2D>();
+            rb.bodyType = RigidbodyType2D.Static;
             var col = wallsTM.gameObject.AddComponent<TilemapCollider2D>();
             col.compositeOperation = Collider2D.CompositeOperation.Merge;
             wallsTM.gameObject.AddComponent<CompositeCollider2D>();
-            var rb = wallsTM.gameObject.GetComponent<Rigidbody2D>();
-            if (rb != null) rb.bodyType = RigidbodyType2D.Static;
 
             // ── Guardar ───────────────────────────────────────────────────
             EditorUtility.DisplayProgressBar("BIT Dungeon", "Guardando…", 0.97f);
