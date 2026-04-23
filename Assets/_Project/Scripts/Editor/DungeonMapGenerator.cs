@@ -86,20 +86,24 @@ namespace BIT.Editor
         {
             EditorUtility.DisplayProgressBar("BIT Dungeon", "Cargando tiles…", 0.05f);
 
-            // ── cargar tiles ──────────────────────────────────────────────
-            TileBase wall     = AssetDatabase.LoadAssetAtPath<TileBase>(WALL_TILE);
-            TileBase wallFace = AssetDatabase.LoadAssetAtPath<TileBase>(FACE_TILE);
-            TileBase faceAlt  = AssetDatabase.LoadAssetAtPath<TileBase>(FACE_TILE_ALT);
+            // ── cargar tiles (con fallback a assets existentes) ───────────
+            TileBase fallbackFloor = AssetDatabase.LoadAssetAtPath<TileBase>(INT + "/TilesetInteriorFloor_0.asset");
+            TileBase fallbackWall  = AssetDatabase.LoadAssetAtPath<TileBase>(INT + "/TilesetWallSimple_0.asset");
+            TileBase fallbackFace  = AssetDatabase.LoadAssetAtPath<TileBase>(INT + "/TilesetInterior_0.asset");
+
+            TileBase wall     = AssetDatabase.LoadAssetAtPath<TileBase>(WALL_TILE)     ?? fallbackWall;
+            TileBase wallFace = AssetDatabase.LoadAssetAtPath<TileBase>(FACE_TILE)     ?? fallbackFace ?? fallbackWall;
+            TileBase faceAlt  = AssetDatabase.LoadAssetAtPath<TileBase>(FACE_TILE_ALT) ?? wallFace;
 
             var floorTiles = new TileBase[FLOOR_TILES.Length];
             for (int i = 0; i < FLOOR_TILES.Length; i++)
-                floorTiles[i] = AssetDatabase.LoadAssetAtPath<TileBase>(FLOOR_TILES[i]);
+                floorTiles[i] = AssetDatabase.LoadAssetAtPath<TileBase>(FLOOR_TILES[i]) ?? fallbackFloor;
 
             var elem = new TileBase[6];
             for (int i = 0; i < 6; i++)
                 elem[i] = AssetDatabase.LoadAssetAtPath<TileBase>(string.Format(ELEM_PATH, i));
 
-            // Si los tiles nuevos no existen, pedir que se ejecute el setup
+            // Si no hay tiles en ningún lado, ofrecer ejecutar el setup
             if (wall == null || floorTiles[0] == null)
             {
                 EditorUtility.ClearProgressBar();
@@ -111,6 +115,10 @@ namespace BIT.Editor
                 if (run) BITAutoSetup.SetupTilesets();
                 return;
             }
+
+            bool usingFallback = AssetDatabase.LoadAssetAtPath<TileBase>(WALL_TILE) == null;
+            if (usingFallback)
+                Debug.Log("[DungeonMap] Usando tiles de fallback. Ejecuta 'BIT → 1. Configurar Tilesets' para tiles 16x16 óptimos.");
 
             // Aliases con fallback
             TileBase safeWall   = wall;
@@ -166,9 +174,9 @@ namespace BIT.Editor
             // ================================================================
             EditorUtility.DisplayProgressBar("BIT Dungeon", "Pintando detalles…", 0.50f);
 
-            // Cara de la pared NORTE (fila y = PLAY_TOP + 1 = 8)
+            // Cara de la pared NORTE (fila y = PLAY_TOP = 7, visible desde el área jugable)
             for (int x = PLAY_LEFT; x <= PLAY_RIGHT; x++)
-                detailTM.SetTile(new Vector3Int(x, PLAY_TOP + 1, 0), safeFace);
+                detailTM.SetTile(new Vector3Int(x, PLAY_TOP, 0), safeFace);
 
             // Cara de la pared SUR (fila y = PLAY_BOTTOM - 1 = -10)
             for (int x = PLAY_LEFT; x <= PLAY_RIGHT; x++)

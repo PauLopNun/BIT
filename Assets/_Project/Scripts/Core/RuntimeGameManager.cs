@@ -489,32 +489,41 @@ namespace BIT.Core
 
         IEnumerator LoadAudioClips()
         {
-            yield return null; // Esperar un frame
+            yield return null;
 
-            // Intentar cargar musica
-            string musicPath = "Ninja Adventure/Audio/Musics/";
-            _backgroundMusic = Resources.Load<AudioClip>(musicPath + "1 - Adventure Begin");
-
-            if (_backgroundMusic == null)
+#if UNITY_EDITOR
+            const string BASE = "Assets/_Project/Sprites/Ninja Adventure/Audio/";
+            string[] musicCandidates = {
+                "Musics/17 - Fight.ogg",
+                "Musics/1 - Adventure Begin.ogg",
+                "Musics/10 - Dark Castle.ogg"
+            };
+            foreach (var m in musicCandidates)
             {
-                // Buscar en la carpeta de assets directamente
-                string[] musicFiles = { "1 - Adventure Begin", "4 - Village", "36 - Village", "35 - Adventure" };
-                foreach (string file in musicFiles)
-                {
-                    _backgroundMusic = Resources.Load<AudioClip>(musicPath + file);
-                    if (_backgroundMusic != null) break;
-                }
+                _backgroundMusic = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + m);
+                if (_backgroundMusic != null) break;
             }
+            _hitSound        = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Hit & Impact/Hit1.wav");
+            _coinSound       = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Bonus/Coin.wav");
+            _healSound       = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Magic & Skill/Heal.wav");
+            _attackSound     = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Whoosh & Slash/Slash.wav");
+            _enemyDeathSound = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Hit & Impact/Hit2.wav");
+#else
+            // Para builds: copia los audios a Assets/Resources/Ninja Adventure/Audio/
+            string mPath = "Ninja Adventure/Audio/Musics/";
+            foreach (var f in new[] { "17 - Fight", "1 - Adventure Begin", "10 - Dark Castle" })
+            {
+                _backgroundMusic = Resources.Load<AudioClip>(mPath + f);
+                if (_backgroundMusic != null) break;
+            }
+            string sPath = "Ninja Adventure/Audio/Sounds/";
+            _hitSound        = Resources.Load<AudioClip>(sPath + "Hit & Impact/Hit1");
+            _coinSound       = Resources.Load<AudioClip>(sPath + "Bonus/Coin");
+            _healSound       = Resources.Load<AudioClip>(sPath + "Magic & Skill/Heal");
+            _attackSound     = Resources.Load<AudioClip>(sPath + "Whoosh & Slash/Slash");
+            _enemyDeathSound = Resources.Load<AudioClip>(sPath + "Hit & Impact/Hit2");
+#endif
 
-            // Cargar efectos de sonido
-            string sfxPath = "Ninja Adventure/Audio/Sounds/";
-            _hitSound = Resources.Load<AudioClip>(sfxPath + "Hit & Impact/Hit1");
-            _coinSound = Resources.Load<AudioClip>(sfxPath + "Bonus/Coin1");
-            _healSound = Resources.Load<AudioClip>(sfxPath + "Bonus/Heal1");
-            _attackSound = Resources.Load<AudioClip>(sfxPath + "Whoosh & Slash/Slash1");
-            _enemyDeathSound = Resources.Load<AudioClip>(sfxPath + "Hit & Impact/Hit2");
-
-            // Iniciar musica si se cargo
             if (_backgroundMusic != null)
             {
                 _musicSource.clip = _backgroundMusic;
@@ -523,8 +532,13 @@ namespace BIT.Core
             }
             else
             {
-                Debug.Log("[RuntimeGameManager] No se encontro musica en Resources. Coloca audios en Assets/Resources/Ninja Adventure/Audio/");
+                Debug.LogWarning("[RuntimeGameManager] No se encontro musica. En builds, coloca audios en Assets/Resources/Ninja Adventure/Audio/");
             }
+
+            int sfxCount = (_hitSound != null ? 1 : 0) + (_coinSound != null ? 1 : 0) +
+                           (_healSound != null ? 1 : 0) + (_attackSound != null ? 1 : 0) +
+                           (_enemyDeathSound != null ? 1 : 0);
+            Debug.Log($"[RuntimeGameManager] {sfxCount}/5 SFX cargados");
         }
 
         // ====================================================================
