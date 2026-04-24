@@ -828,7 +828,6 @@ namespace BIT.Player
             _walkSprites   = LoadSortedSprites(dir + "/Walk.png");
             _attackSprites = LoadSortedSprites(dir + "/Attack.png");
 
-            int total = (_idleSprites?.Length ?? 0) + (_walkSprites?.Length ?? 0) + (_attackSprites?.Length ?? 0);
             Debug.Log($"[Player] Sprites cargados — Idle:{_idleSprites?.Length} Walk:{_walkSprites?.Length} Attack:{_attackSprites?.Length}");
 #endif
         }
