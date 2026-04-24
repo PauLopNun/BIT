@@ -67,21 +67,21 @@ namespace BIT.UI
                 MakeCharacter(
                     "Ninja Azul", "Equilibrado — Bueno en todo.",
                     new Color(0.35f, 0.65f, 1f),
-                    maxHealth: 100, speed: 5f, damage: 15, cooldown: 0.3f,
+                    maxHealth: 100, speed: 6f, damage: 15, cooldown: 0.3f,
                     dashSpeed: 18f, dashDur: 0.18f, dashCD: 3f,
                     spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaBlue/SeparateAnim/Idle.png"),
 
                 MakeCharacter(
                     "Ninja Rojo", "Guerrero — Alto daño, más lento.",
                     new Color(1f, 0.25f, 0.25f),
-                    maxHealth: 80, speed: 3.5f, damage: 28, cooldown: 0.5f,
+                    maxHealth: 80, speed: 5f, damage: 28, cooldown: 0.5f,
                     dashSpeed: 22f, dashDur: 0.22f, dashCD: 4f,
                     spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaRed/SeparateAnim/Idle.png"),
 
                 MakeCharacter(
                     "Ninja Verde", "Explorador — Rápido, más resistente.",
                     new Color(0.2f, 0.9f, 0.4f),
-                    maxHealth: 140, speed: 7f, damage: 10, cooldown: 0.22f,
+                    maxHealth: 140, speed: 8.5f, damage: 10, cooldown: 0.22f,
                     dashSpeed: 24f, dashDur: 0.15f, dashCD: 2f,
                     spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaGreen/SeparateAnim/Idle.png"),
             };

@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Linq;
 
 // ============================================================================
 // VFXMANAGER.CS - Sistema de efectos visuales
@@ -70,9 +71,123 @@ namespace BIT.Core
             }
             else
             {
-                // Crear efecto simple si no hay prefab
                 StartCoroutine(SimpleSlashEffect(position, direction));
             }
+        }
+
+        // Cache de sprites de katana
+        private Sprite[] _katanaSprites;
+        private bool _katanaLoaded;
+
+        /// <summary>
+        /// Animación de espada usando el Katana.png real del asset pack
+        /// </summary>
+        public void SpawnMeleeSwordSwing(Vector3 playerPos, Vector2 direction)
+        {
+            if (!gameObject.activeInHierarchy) return;
+            StartCoroutine(KatanaSwingEffect(playerPos, direction));
+        }
+
+        IEnumerator KatanaSwingEffect(Vector3 playerPos, Vector2 direction)
+        {
+            if (!_katanaLoaded) LoadKatanaSprites();
+
+            float baseAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+
+            if (_katanaSprites != null && _katanaSprites.Length > 0)
+            {
+                // Overlay con sprite real de Katana.png (16 frames)
+                var go = new GameObject("KatanaOverlay");
+                go.transform.position = playerPos + (Vector3)direction * 0.25f;
+                go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle - 90f);
+                go.transform.localScale = Vector3.one * 1.4f;
+
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sortingOrder = 25;
+
+                int frames = Mathf.Min(_katanaSprites.Length, 10);
+                for (int i = 0; i < frames; i++)
+                {
+                    if (go == null) yield break;
+                    sr.sprite = _katanaSprites[i];
+                    float alpha = 1f - (float)i / frames;
+                    sr.color = new Color(1f, 1f, 1f, alpha);
+                    yield return new WaitForSeconds(0.038f);
+                }
+                if (go != null) Destroy(go);
+            }
+            else
+            {
+                // Fallback procedural en abanico
+                yield return StartCoroutine(ProceduralSwordSwing(playerPos, baseAngle));
+            }
+        }
+
+        void LoadKatanaSprites()
+        {
+            _katanaLoaded = true;
+#if UNITY_EDITOR
+            const string PATH = "Assets/_Project/Sprites/Ninja Adventure/Actor/CharacterAnimated/Weapon/Katana.png";
+            _katanaSprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(PATH)
+                .OfType<Sprite>()
+                .OrderBy(s =>
+                {
+                    int i = s.name.LastIndexOf('_');
+                    return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999;
+                })
+                .ToArray();
+            if (_katanaSprites != null && _katanaSprites.Length > 0)
+                Debug.Log($"[VFXManager] Katana sprites cargados: {_katanaSprites.Length}");
+            else
+                Debug.LogWarning("[VFXManager] Katana.png no encontrado — usando VFX procedural");
+#endif
+        }
+
+        IEnumerator ProceduralSwordSwing(Vector3 playerPos, float baseAngle)
+        {
+            float[] angleOffsets = { -40f, 0f, 40f };
+            float[] scales       = { 1.4f, 2.0f, 1.4f };
+
+            for (int i = 0; i < angleOffsets.Length; i++)
+            {
+                float rad = (baseAngle + angleOffsets[i]) * Mathf.Deg2Rad;
+                Vector3 pos = playerPos + new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f) * 0.7f;
+
+                var go = new GameObject("SwordSlash");
+                go.transform.position = pos;
+                go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle + angleOffsets[i] - 90f);
+                go.transform.localScale = Vector3.one * scales[i];
+
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = CreateSlashSprite();
+                sr.color = new Color(1f, 0.95f, 0.45f);
+                sr.sortingOrder = 25;
+
+                StartCoroutine(AnimateSlashFade(go, 0.25f));
+                yield return new WaitForSeconds(0.045f);
+            }
+        }
+
+        IEnumerator AnimateSlashFade(GameObject go, float duration)
+        {
+            if (go == null) yield break;
+            var sr = go.GetComponent<SpriteRenderer>();
+            if (sr == null) { Destroy(go); yield break; }
+
+            Vector3 startScale = go.transform.localScale;
+            float elapsed = 0f;
+            while (elapsed < duration && go != null)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                if (go != null && sr != null)
+                {
+                    go.transform.localScale = startScale * (1f + t * 0.9f);
+                    sr.color = new Color(1f, 0.95f, 0.45f, 1f - t);
+                }
+                yield return null;
+            }
+            if (go != null) Destroy(go);
         }
 
         /// <summary>

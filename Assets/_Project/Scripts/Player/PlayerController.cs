@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Linq;
 
 // ============================================================================
 // PLAYERCONTROLLER.CS - Controlador principal del jugador
@@ -67,7 +68,15 @@ namespace BIT.Player
         [Tooltip("Puntuación")]
         public int score = 0;
 
-        [Header("=== DASH (segundo ataque) ===")]
+        [Header("=== SHURIKEN (Clic Derecho) ===")]
+        [Tooltip("Daño del shuriken manual")]
+        public int shurikenDamage = 20;
+        [Tooltip("Velocidad del shuriken lanzado")]
+        public float shurikenSpeed = 14f;
+        [Tooltip("Cooldown entre shurikens manuales (segundos)")]
+        public float shurikenCooldown = 0.45f;
+
+        [Header("=== DASH (Shift) ===")]
         [Tooltip("Velocidad durante el dash")]
         public float dashSpeed = 18f;
 
@@ -100,6 +109,14 @@ namespace BIT.Player
         private float lastAttackTime;
         private bool canMove = true;
         private bool _isDead = false;
+
+        // Sprites de animación cargados desde los assets del personaje
+        private Sprite[] _idleSprites;
+        private Sprite[] _walkSprites;
+        private Sprite[] _attackSprites;
+        private float _animTimer;
+        private int _animFrame;
+        private bool _isAttackingAnim;
 
         // ====================================================================
         // INICIALIZACIÓN
@@ -231,15 +248,21 @@ namespace BIT.Player
             UpdateSpriteDirection();
 
             // --------------------------------------------------------
-            // DASH ATTACK — Shift o botón secundario
+            // DASH ATTACK — solo Shift
             // --------------------------------------------------------
-            if (_dashCooldownTimer > 0f) _dashCooldownTimer -= Time.deltaTime;
+            if (_dashCooldownTimer  > 0f) _dashCooldownTimer  -= Time.deltaTime;
+            if (_shurikenCooldownTimer > 0f) _shurikenCooldownTimer -= Time.deltaTime;
 
-            bool dashInput = (Keyboard.current != null && Keyboard.current.shiftKey.wasPressedThisFrame)
-                          || (Mouse.current   != null && Mouse.current.rightButton.wasPressedThisFrame);
-
-            if (!_isDashing && _dashCooldownTimer <= 0f && canMove && dashInput)
+            if (!_isDashing && _dashCooldownTimer <= 0f && canMove
+                && Keyboard.current != null && Keyboard.current.shiftKey.wasPressedThisFrame)
                 StartCoroutine(DashAttack());
+
+            // --------------------------------------------------------
+            // SHURIKEN — Clic derecho
+            // --------------------------------------------------------
+            if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame
+                && _shurikenCooldownTimer <= 0f && canMove && !_isDashing)
+                ThrowShuriken();
         }
 
         // ====================================================================
@@ -279,27 +302,58 @@ namespace BIT.Player
 
         void UpdateAnimations()
         {
-            // Si no hay Animator, salimos
-            if (animator == null) return;
-
-            // Velocidad de movimiento (para saber si está caminando o idle)
-            float speed = moveInput.magnitude;
-
-            // Intentamos setear los parámetros del Animator
-            // Si no existen, no pasa nada (el try-catch previene errores)
-            try
+            // Pasar velocidad al Animator por si existe uno configurado
+            if (animator != null)
             {
-                animator.SetFloat("Speed", speed);
-                animator.SetFloat("MoveX", lastMoveDirection.x);
-                animator.SetFloat("MoveY", lastMoveDirection.y);
+                try
+                {
+                    animator.SetFloat("Speed", moveInput.magnitude);
+                    animator.SetFloat("MoveX", lastMoveDirection.x);
+                    animator.SetFloat("MoveY", lastMoveDirection.y);
+                }
+                catch { }
             }
-            catch { }
+
+            // Animación por código usando sprites del asset pack
+            if (spriteRenderer == null || _isAttackingAnim) return;
+
+            bool moving = moveInput.magnitude > 0.1f;
+            Sprite[] frames = moving ? _walkSprites : _idleSprites;
+            if (frames == null || frames.Length == 0) return;
+
+            float fps = moving ? 10f : 4f;
+            _animTimer += Time.deltaTime;
+            if (_animTimer >= 1f / fps)
+            {
+                _animTimer = 0f;
+                _animFrame = (_animFrame + 1) % frames.Length;
+                spriteRenderer.sprite = frames[_animFrame];
+            }
         }
 
         void UpdateSpriteDirection()
         {
-            // Las animaciones de Walk/Idle ya tienen sprites por dirección (Left/Right/Up/Down)
-            // No se necesita flipX
+            if (spriteRenderer == null) return;
+            // Voltear el sprite horizontalmente según la dirección X
+            if (Mathf.Abs(lastMoveDirection.x) > 0.1f)
+                spriteRenderer.flipX = lastMoveDirection.x < 0f;
+        }
+
+        System.Collections.IEnumerator PlayAttackAnimation()
+        {
+            if (_attackSprites == null || _attackSprites.Length == 0 || spriteRenderer == null)
+                yield break;
+
+            _isAttackingAnim = true;
+            _animFrame = 0;
+
+            foreach (var frame in _attackSprites)
+            {
+                spriteRenderer.sprite = frame;
+                yield return new WaitForSeconds(0.07f);
+            }
+
+            _isAttackingAnim = false;
         }
 
         // ====================================================================
@@ -328,10 +382,13 @@ namespace BIT.Player
             // Posición del ataque (delante del jugador)
             Vector3 attackPos = transform.position + (Vector3)lastMoveDirection * 0.5f;
 
-            // Efecto visual de slash
+            // Animación de ataque del personaje (sprites Attack.png reales)
+            StartCoroutine(PlayAttackAnimation());
+
+            // Efecto visual de espada con Katana.png
             if (BIT.Core.VFXManager.Instance != null)
             {
-                BIT.Core.VFXManager.Instance.SpawnSlash(attackPos, lastMoveDirection);
+                BIT.Core.VFXManager.Instance.SpawnMeleeSwordSwing(transform.position, lastMoveDirection);
             }
 
             // ATAQUE MELEE - Buscar enemigos cercanos y hacerles daño
@@ -536,6 +593,7 @@ namespace BIT.Player
         // Dash state
         private bool _isDashing;
         private float _dashCooldownTimer;
+        private float _shurikenCooldownTimer;
 
         /// <summary>
         /// Modifica la velocidad temporalmente (power-up o trampa de lentitud)
@@ -577,9 +635,77 @@ namespace BIT.Player
         }
 
         // ====================================================================
+        // SHURIKEN MANUAL — Clic derecho
+        // ====================================================================
+
+        void ThrowShuriken()
+        {
+            _shurikenCooldownTimer = shurikenCooldown;
+
+            if (Mouse.current == null || Camera.main == null) return;
+
+            Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
+            Vector3 mouseWorldPos  = Camera.main.ScreenToWorldPoint(
+                new Vector3(mouseScreenPos.x, mouseScreenPos.y, 0f));
+            mouseWorldPos.z = 0f;
+            Vector2 dir = ((Vector2)mouseWorldPos - (Vector2)transform.position).normalized;
+
+            var bulletGO = new GameObject("Shuriken");
+            bulletGO.transform.position = transform.position + (Vector3)dir * 0.45f;
+            bulletGO.tag = "Projectile";
+
+            var sr = bulletGO.AddComponent<SpriteRenderer>();
+            sr.color = new Color(0.85f, 0.9f, 1f);
+            sr.sortingOrder = 4;
+            bulletGO.transform.localScale = Vector3.one * 0.18f;
+
+            // Usar sprite real del Shuriken del asset pack
+#if UNITY_EDITOR
+            const string SHURIKEN_SHEET = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken/SpriteSheet.png";
+            var shurikenSprite = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SHURIKEN_SHEET)
+                .OfType<Sprite>().FirstOrDefault();
+            if (shurikenSprite != null) sr.sprite = shurikenSprite;
+#endif
+            if (sr.sprite == null)
+            {
+                // Fallback procedural si no se carga el asset
+                var tex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
+                var pixels = new Color[256];
+                for (int i = 0; i < 256; i++)
+                {
+                    int x = i % 16, y = i / 16;
+                    float dx = Mathf.Abs(x - 7.5f), dy = Mathf.Abs(y - 7.5f);
+                    pixels[i] = (dx + dy <= 5.5f) ? Color.white : Color.clear;
+                }
+                tex.SetPixels(pixels);
+                tex.Apply();
+                sr.sprite = Sprite.Create(tex, new Rect(0, 0, 16, 16), Vector2.one * 0.5f, 16f);
+                bulletGO.transform.localScale = Vector3.one * 0.3f;
+            }
+
+            var rb = bulletGO.AddComponent<Rigidbody2D>();
+            rb.gravityScale = 0f;
+            rb.freezeRotation = false;
+            rb.linearVelocity  = dir * shurikenSpeed;
+            rb.angularVelocity = 480f;
+
+            var col = bulletGO.AddComponent<CircleCollider2D>();
+            col.isTrigger = true;
+            col.radius    = 0.5f;
+
+            var bullet = bulletGO.AddComponent<PlayerBullet>();
+            bullet.damage = shurikenDamage;
+
+            Destroy(bulletGO, 4f);
+
+            if (BIT.Core.RuntimeGameManager.Instance != null)
+                BIT.Core.RuntimeGameManager.Instance.PlayAttackSound();
+        }
+
+        // ====================================================================
         // DASH ATTACK — segundo tipo de ataque
         // ====================================================================
-        // Shift / Clic derecho: dash en la dirección de movimiento.
+        // Shift: dash en la dirección de movimiento.
         // Durante el dash el jugador es invulnerable y daña al doble.
         // Cooldown: 3 segundos (configurable por personaje).
 
@@ -682,7 +808,46 @@ namespace BIT.Player
             if (BIT.Core.RuntimeGameManager.Instance != null)
                 BIT.Core.RuntimeGameManager.Instance.SetHealth(currentHealth, maxHealth);
 
+            // Cargar sprites de animación del personaje
+            LoadCharacterSprites(data.spritePath);
+
             Debug.Log($"[Player] Personaje aplicado: {data.characterName} — HP:{maxHealth} SPD:{moveSpeed} DMG:{meleeDamage}");
+        }
+
+        // ====================================================================
+        // CARGA DE SPRITES DE ANIMACIÓN
+        // ====================================================================
+
+        void LoadCharacterSprites(string idlePath)
+        {
+#if UNITY_EDITOR
+            if (string.IsNullOrEmpty(idlePath)) return;
+
+            string dir = System.IO.Path.GetDirectoryName(idlePath).Replace("\\", "/");
+            _idleSprites   = LoadSortedSprites(idlePath);
+            _walkSprites   = LoadSortedSprites(dir + "/Walk.png");
+            _attackSprites = LoadSortedSprites(dir + "/Attack.png");
+
+            int total = (_idleSprites?.Length ?? 0) + (_walkSprites?.Length ?? 0) + (_attackSprites?.Length ?? 0);
+            Debug.Log($"[Player] Sprites cargados — Idle:{_idleSprites?.Length} Walk:{_walkSprites?.Length} Attack:{_attackSprites?.Length}");
+#endif
+        }
+
+        static Sprite[] LoadSortedSprites(string path)
+        {
+#if UNITY_EDITOR
+            var sprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path)
+                .OfType<Sprite>()
+                .OrderBy(s =>
+                {
+                    int i = s.name.LastIndexOf('_');
+                    return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999;
+                })
+                .ToArray();
+            return sprites.Length > 0 ? sprites : null;
+#else
+            return null;
+#endif
         }
     }
 }
