@@ -67,21 +67,21 @@ namespace BIT.UI
                 MakeCharacter(
                     "Ninja Azul", "Equilibrado — Bueno en todo.",
                     new Color(0.35f, 0.65f, 1f),
-                    maxHealth: 100, speed: 6f, damage: 15, cooldown: 0.3f,
+                    maxHealth: 100, speed: 6f, damage: 22, cooldown: 0.3f,
                     dashSpeed: 18f, dashDur: 0.18f, dashCD: 3f,
                     spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaBlue/SeparateAnim/Idle.png"),
 
                 MakeCharacter(
                     "Ninja Rojo", "Guerrero — Alto daño, más lento.",
                     new Color(1f, 0.25f, 0.25f),
-                    maxHealth: 80, speed: 5f, damage: 28, cooldown: 0.5f,
+                    maxHealth: 80, speed: 5f, damage: 40, cooldown: 0.5f,
                     dashSpeed: 22f, dashDur: 0.22f, dashCD: 4f,
                     spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaRed/SeparateAnim/Idle.png"),
 
                 MakeCharacter(
                     "Ninja Verde", "Explorador — Rápido, más resistente.",
                     new Color(0.2f, 0.9f, 0.4f),
-                    maxHealth: 140, speed: 8.5f, damage: 10, cooldown: 0.22f,
+                    maxHealth: 140, speed: 8.5f, damage: 15, cooldown: 0.22f,
                     dashSpeed: 24f, dashDur: 0.15f, dashCD: 2f,
                     spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaGreen/SeparateAnim/Idle.png"),
             };
@@ -228,7 +228,17 @@ namespace BIT.UI
             avatarRT.anchorMax = new Vector2(0.85f, 0.97f);
             avatarRT.offsetMin = avatarRT.offsetMax = Vector2.zero;
 
-            Sprite characterSprite = TryLoadSprite(data.spritePath);
+            // Prefer Faceset.png (face portrait) over Idle.png for the avatar
+            string facesetPath = string.Empty;
+            if (!string.IsNullOrEmpty(data.spritePath))
+            {
+                string animDir = System.IO.Path.GetDirectoryName(data.spritePath).Replace("\\", "/");
+                string charDir = System.IO.Path.GetDirectoryName(animDir).Replace("\\", "/");
+                facesetPath = charDir + "/Faceset.png";
+            }
+            Sprite characterSprite = TryLoadSprite(facesetPath);
+            if (characterSprite == null)
+                characterSprite = TryLoadSprite(data.spritePath);
             if (characterSprite != null)
             {
                 var sprImg = avatarGO.GetComponent<Image>();
@@ -303,7 +313,7 @@ namespace BIT.UI
         // ====================================================================
         static float NormalizeHealth(int hp)   => Mathf.InverseLerp(50, 200, hp);
         static float NormalizeSpeed(float s)   => Mathf.InverseLerp(2f, 9f, s);
-        static float NormalizeDamage(int dmg)  => Mathf.InverseLerp(5, 35, dmg);
+        static float NormalizeDamage(int dmg)  => Mathf.InverseLerp(5, 50, dmg);
         static float NormalizeDash(float cd)   => Mathf.InverseLerp(5f, 1f, cd); // menos CD = mejor
 
         // ====================================================================

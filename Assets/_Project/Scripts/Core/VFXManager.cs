@@ -98,9 +98,9 @@ namespace BIT.Core
             {
                 // Overlay con sprite real de Katana.png (16 frames)
                 var go = new GameObject("KatanaOverlay");
-                go.transform.position = playerPos + (Vector3)direction * 0.25f;
+                go.transform.position = playerPos + (Vector3)direction * 0.6f;
                 go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle - 90f);
-                go.transform.localScale = Vector3.one * 1.4f;
+                go.transform.localScale = Vector3.one * 4f;
 
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sortingOrder = 25;
@@ -110,9 +110,9 @@ namespace BIT.Core
                 {
                     if (go == null) yield break;
                     sr.sprite = _katanaSprites[i];
-                    float alpha = 1f - (float)i / frames;
+                    float alpha = 1f - (float)i / frames * 0.8f;
                     sr.color = new Color(1f, 1f, 1f, alpha);
-                    yield return new WaitForSeconds(0.038f);
+                    yield return new WaitForSeconds(0.05f);
                 }
                 if (go != null) Destroy(go);
             }

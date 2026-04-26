@@ -341,16 +341,32 @@ namespace BIT.Player
 
         System.Collections.IEnumerator PlayAttackAnimation()
         {
-            if (_attackSprites == null || _attackSprites.Length == 0 || spriteRenderer == null)
-                yield break;
-
             _isAttackingAnim = true;
             _animFrame = 0;
 
-            foreach (var frame in _attackSprites)
+            if (_attackSprites != null && _attackSprites.Length > 0 && spriteRenderer != null)
             {
-                spriteRenderer.sprite = frame;
-                yield return new WaitForSeconds(0.07f);
+                // Play each attack frame, repeating the cycle once so it's visible
+                int cycles = _attackSprites.Length <= 2 ? 2 : 1;
+                for (int c = 0; c < cycles; c++)
+                {
+                    foreach (var frame in _attackSprites)
+                    {
+                        if (spriteRenderer == null) break;
+                        spriteRenderer.sprite = frame;
+                        // Tint briefly orange-red to signal attack
+                        spriteRenderer.color = new Color(1f, 0.6f, 0.2f);
+                        yield return new WaitForSeconds(0.1f);
+                        if (spriteRenderer != null) spriteRenderer.color = Color.white;
+                    }
+                }
+            }
+            else
+            {
+                // Fallback: color flash when no attack sprites
+                if (spriteRenderer != null) spriteRenderer.color = new Color(1f, 0.5f, 0.1f);
+                yield return new WaitForSeconds(0.15f);
+                if (spriteRenderer != null) spriteRenderer.color = Color.white;
             }
 
             _isAttackingAnim = false;
@@ -393,12 +409,6 @@ namespace BIT.Player
 
             // ATAQUE MELEE - Buscar enemigos cercanos y hacerles daño
             PerformMeleeAttack(attackPos);
-
-            // Si tenemos proyectil configurado, lo lanzamos
-            if (projectilePrefab != null)
-            {
-                LaunchProjectile();
-            }
 
             Debug.Log("[Player] ¡Ataque!");
         }
@@ -530,11 +540,10 @@ namespace BIT.Player
         System.Collections.IEnumerator DamageFlash()
         {
             if (spriteRenderer == null) yield break;
-
-            Color originalColor = spriteRenderer.color;
+            _isAttackingAnim = false; // cancel attack tint if hit
             spriteRenderer.color = Color.red;
             yield return new WaitForSeconds(0.1f);
-            spriteRenderer.color = originalColor;
+            if (spriteRenderer != null) spriteRenderer.color = Color.white;
         }
 
         void Die()

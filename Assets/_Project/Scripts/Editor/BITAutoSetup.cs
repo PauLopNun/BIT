@@ -21,6 +21,42 @@ using BIT.Core;
 
 namespace BIT.Editor
 {
+    // Auto-fix pickup prefabs with missing scripts every time scripts recompile
+    [InitializeOnLoad]
+    static class PickupPrefabAutoFix
+    {
+        static PickupPrefabAutoFix()
+        {
+            EditorApplication.delayCall += FixPickupPrefabs;
+        }
+
+        static void FixPickupPrefabs()
+        {
+            string[] prefabPaths = {
+                "Assets/_Project/Prefabs/Pickups/Heart.prefab",
+                "Assets/_Project/Prefabs/Pickups/Coin.prefab"
+            };
+            foreach (var path in prefabPaths)
+            {
+                if (!System.IO.File.Exists(path)) continue;
+                var root = PrefabUtility.LoadPrefabContents(path);
+                if (root == null) continue;
+                bool changed = false;
+                foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                {
+                    int removed = GameObjectUtility.RemoveMonoBehavioursWithMissingScript(t.gameObject);
+                    if (removed > 0) changed = true;
+                }
+                if (changed)
+                {
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                    Debug.Log($"[BIT] Fixed missing scripts in {System.IO.Path.GetFileName(path)}");
+                }
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+    }
+
     public static class BITAutoSetup
     {
         // ====================================================================

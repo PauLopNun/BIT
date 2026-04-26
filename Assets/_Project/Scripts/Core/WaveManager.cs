@@ -406,43 +406,59 @@ namespace BIT.Core
 
         private GameObject CreateRangedEnemyAtRuntime(Vector3 pos)
         {
-            var go = new GameObject("Enemy_Ranged");
-            go.transform.position = pos;
-            go.tag = "Enemy";
+            // Use the skeleton prefab as visual base — guaranteed to have real sprites
+            GameObject basePrefab = _basicEnemyPrefab ?? _fastEnemyPrefab ?? _tankEnemyPrefab;
 
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sortingOrder = 2;
-
-            // Try to load SkullBlue sprite
-            var sprite = LoadFirstAvailableSprite(
-                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/SkullBlue/SpriteSheet.png",
-                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Skull/SpriteSheet.png");
-            if (sprite != null)
+            GameObject go;
+            if (basePrefab != null)
             {
-                sr.sprite = sprite;
-                sr.color = Color.white;
+                go = Instantiate(basePrefab, pos, Quaternion.identity);
+                go.name = "Enemy_Ranged";
+
+                // Blue-purple tint to distinguish from normal melee enemies
+                var sr = go.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.color = new Color(0.45f, 0.65f, 1f);
+
+                // Remove existing melee AI components and add ranged AI
+                var existingEnemyAI = go.GetComponent<BIT.Enemy.EnemyAI>();
+                if (existingEnemyAI != null) Destroy(existingEnemyAI);
+                var existingSimpleAI = go.GetComponent<SimpleEnemyAI>();
+                if (existingSimpleAI != null) Destroy(existingSimpleAI);
+
+                if (go.GetComponent<BIT.Enemy.RangedEnemyAI>() == null)
+                    go.AddComponent<BIT.Enemy.RangedEnemyAI>();
             }
             else
             {
-                // No sprite found — draw a simple skull shape with color
-                sr.color = new Color(0.9f, 0.9f, 0.85f);
+                // Fallback if no prefab is assigned yet
+                go = new GameObject("Enemy_Ranged");
+                go.transform.position = pos;
+                go.tag = "Enemy";
+
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sortingOrder = 2;
+                sr.color = new Color(0.45f, 0.65f, 1f);
+
+                var rb = go.AddComponent<Rigidbody2D>();
+                rb.gravityScale = 0f;
+                rb.freezeRotation = true;
+
+                var col = go.AddComponent<CircleCollider2D>();
+                col.radius = 0.4f;
+
+                go.AddComponent<BIT.Enemy.RangedEnemyAI>();
             }
 
-            var rb = go.AddComponent<Rigidbody2D>();
-            rb.gravityScale = 0f;
-            rb.freezeRotation = true;
-
-            var col = go.AddComponent<CircleCollider2D>();
-            col.radius = 0.4f;
-
-            go.AddComponent<BIT.Enemy.RangedEnemyAI>();
-
             // Item drops so ranged enemies feel rewarding to kill
-            var dropper = go.AddComponent<BIT.Enemy.EnemyDropper>();
-            var heartPrefab = LoadPickupPrefab("Heart");
-            var coinPrefab  = LoadPickupPrefab("Coin");
-            if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.18f);
-            if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.50f);
+            var dropper = go.GetComponent<BIT.Enemy.EnemyDropper>();
+            if (dropper == null)
+            {
+                dropper = go.AddComponent<BIT.Enemy.EnemyDropper>();
+                var heartPrefab = LoadPickupPrefab("Heart");
+                var coinPrefab  = LoadPickupPrefab("Coin");
+                if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.18f);
+                if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.50f);
+            }
 
             return go;
         }
