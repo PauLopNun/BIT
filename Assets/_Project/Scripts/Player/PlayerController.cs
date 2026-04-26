@@ -410,12 +410,6 @@ namespace BIT.Player
             // ATAQUE MELEE - Buscar enemigos cercanos y hacerles daño
             PerformMeleeAttack(attackPos);
 
-            // Si tenemos proyectil configurado, lo lanzamos
-            if (projectilePrefab != null)
-            {
-                LaunchProjectile();
-            }
-
             Debug.Log("[Player] ¡Ataque!");
         }
 

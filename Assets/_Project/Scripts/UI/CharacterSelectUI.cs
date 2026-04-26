@@ -228,7 +228,17 @@ namespace BIT.UI
             avatarRT.anchorMax = new Vector2(0.85f, 0.97f);
             avatarRT.offsetMin = avatarRT.offsetMax = Vector2.zero;
 
-            Sprite characterSprite = TryLoadSprite(data.spritePath);
+            // Prefer Faceset.png (face portrait) over Idle.png for the avatar
+            string facesetPath = string.Empty;
+            if (!string.IsNullOrEmpty(data.spritePath))
+            {
+                string animDir = System.IO.Path.GetDirectoryName(data.spritePath).Replace("\\", "/");
+                string charDir = System.IO.Path.GetDirectoryName(animDir).Replace("\\", "/");
+                facesetPath = charDir + "/Faceset.png";
+            }
+            Sprite characterSprite = TryLoadSprite(facesetPath);
+            if (characterSprite == null)
+                characterSprite = TryLoadSprite(data.spritePath);
             if (characterSprite != null)
             {
                 var sprImg = avatarGO.GetComponent<Image>();
@@ -303,7 +313,7 @@ namespace BIT.UI
         // ====================================================================
         static float NormalizeHealth(int hp)   => Mathf.InverseLerp(50, 200, hp);
         static float NormalizeSpeed(float s)   => Mathf.InverseLerp(2f, 9f, s);
-        static float NormalizeDamage(int dmg)  => Mathf.InverseLerp(5, 35, dmg);
+        static float NormalizeDamage(int dmg)  => Mathf.InverseLerp(5, 50, dmg);
         static float NormalizeDash(float cd)   => Mathf.InverseLerp(5f, 1f, cd); // menos CD = mejor
 
         // ====================================================================
