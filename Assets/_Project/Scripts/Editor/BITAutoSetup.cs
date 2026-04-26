@@ -94,7 +94,10 @@ namespace BIT.Editor
             EditorUtility.DisplayProgressBar("BIT – Tilesets", "Sliceando TilesetInterior.png…", 0.6f);
             SliceTileset(INT_PATH + "/TilesetInterior.png", "Interior");
 
-            EditorUtility.DisplayProgressBar("BIT – Tilesets", "Creando tile assets…", 0.8f);
+            EditorUtility.DisplayProgressBar("BIT – Tilesets", "Configurando sprites FX y proyectiles…", 0.75f);
+            ConfigureFXSprites();
+
+            EditorUtility.DisplayProgressBar("BIT – Tilesets", "Creando tile assets…", 0.85f);
             CreateTileFolder();
             CreateTileAssets();
 
@@ -107,6 +110,61 @@ namespace BIT.Editor
                 "Assets creados en:\n  Assets/_Project/Tiles/Interior/\n\n" +
                 "Ahora ejecuta: BIT → 2. Configurar Escena",
                 "OK");
+        }
+
+        // ====================================================================
+        // CONFIGURAR SPRITES FX Y PROYECTILES (PPU=16, Multiple si aplica)
+        // ====================================================================
+
+        static void ConfigureFXSprites()
+        {
+            const string FX_ATTACK = "Assets/_Project/Sprites/Ninja Adventure/FX/Attack";
+            const string FX_PROJ   = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile";
+            const string WEAPON    = "Assets/_Project/Sprites/Ninja Adventure/Actor/CharacterAnimated/Weapon";
+
+            // Sprite sheets de ataque (animaciones FX, cada frame ocupa todo el sheet o usa slices propios)
+            string[] fxSheets =
+            {
+                FX_ATTACK + "/CircularSlash/SpriteSheet.png",
+                FX_ATTACK + "/Claw/SpriteSheet.png",
+                FX_PROJ   + "/Shuriken/SpriteSheet.png",
+                FX_PROJ   + "/Kunai/SpriteSheet.png",
+                FX_PROJ   + "/Shuriken.png",
+                FX_PROJ   + "/Kunai.png",
+                FX_PROJ   + "/BigShuriken.png",
+                WEAPON    + "/Katana.png",
+            };
+
+            int configured = 0;
+            foreach (var path in fxSheets)
+            {
+                var imp = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (imp == null) continue;
+
+                bool changed = false;
+                if (imp.spritePixelsPerUnit != 16f)
+                {
+                    imp.spritePixelsPerUnit = 16f;
+                    changed = true;
+                }
+                if (imp.filterMode != FilterMode.Point)
+                {
+                    imp.filterMode = FilterMode.Point;
+                    changed = true;
+                }
+                // Sólo forzar Single en los sprites de una sola imagen (no las hojas de animación)
+                if (imp.spriteImportMode == SpriteImportMode.Single && path.Contains("SpriteSheet"))
+                {
+                    // No cambiar hojas de animación ya configuradas como Multiple
+                }
+                if (changed)
+                {
+                    imp.SaveAndReimport();
+                    configured++;
+                }
+            }
+            if (configured > 0)
+                Debug.Log($"[BITAutoSetup] {configured} sprites FX reconfigurados a PPU=16");
         }
 
         // ====================================================================

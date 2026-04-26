@@ -40,10 +40,10 @@ namespace BIT.Player
 
         [Header("=== COMBATE MELEE ===")]
         [Tooltip("Daño del ataque melee")]
-        public int meleeDamage = 15;
+        public int meleeDamage = 25;
 
         [Tooltip("Radio del ataque melee")]
-        public float meleeRange = 1.2f;
+        public float meleeRange = 2.0f;
 
         [Tooltip("Tiempo entre ataques")]
         public float attackCooldown = 0.3f;
@@ -69,12 +69,14 @@ namespace BIT.Player
         public int score = 0;
 
         [Header("=== SHURIKEN (Clic Derecho) ===")]
-        [Tooltip("Daño del shuriken manual")]
+        [Tooltip("Daño del shuriken manual (sin carga)")]
         public int shurikenDamage = 20;
         [Tooltip("Velocidad del shuriken lanzado")]
         public float shurikenSpeed = 14f;
         [Tooltip("Cooldown entre shurikens manuales (segundos)")]
         public float shurikenCooldown = 0.45f;
+        [Tooltip("Tiempo máximo de carga del shuriken (segundos)")]
+        public float maxChargeTime = 1.5f;
 
         [Header("=== DASH (Shift) ===")]
         [Tooltip("Velocidad durante el dash")]
@@ -258,11 +260,45 @@ namespace BIT.Player
                 StartCoroutine(DashAttack());
 
             // --------------------------------------------------------
-            // SHURIKEN — Clic derecho
+            // SHURIKEN — Clic derecho (mantener para cargar, soltar para lanzar)
             // --------------------------------------------------------
-            if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame
-                && _shurikenCooldownTimer <= 0f && canMove && !_isDashing)
-                ThrowShuriken();
+            if (Mouse.current != null)
+            {
+                bool rmbPressed  = Mouse.current.rightButton.wasPressedThisFrame;
+                bool rmbHeld     = Mouse.current.rightButton.isPressed;
+                bool rmbReleased = Mouse.current.rightButton.wasReleasedThisFrame;
+
+                // Iniciar carga al presionar
+                if (rmbPressed && _shurikenCooldownTimer <= 0f && canMove && !_isDashing)
+                {
+                    _isChargingShuriken = true;
+                    _chargeStartTime    = Time.time;
+                    InitChargeIndicator();
+                }
+
+                // Actualizar indicador visual mientras se carga
+                if (_isChargingShuriken && rmbHeld)
+                {
+                    float t = Mathf.Clamp01((Time.time - _chargeStartTime) / maxChargeTime);
+                    UpdateChargeIndicator(t);
+                }
+
+                // Lanzar al soltar
+                if (_isChargingShuriken && rmbReleased)
+                {
+                    float chargeT = Mathf.Clamp01((Time.time - _chargeStartTime) / maxChargeTime);
+                    _isChargingShuriken = false;
+                    DestroyChargeIndicator();
+                    ThrowShuriken(chargeT);
+                }
+
+                // Cancelar carga si el jugador queda bloqueado
+                if (_isChargingShuriken && (!canMove || _isDashing))
+                {
+                    _isChargingShuriken = false;
+                    DestroyChargeIndicator();
+                }
+            }
         }
 
         // ====================================================================
@@ -604,6 +640,12 @@ namespace BIT.Player
         private float _dashCooldownTimer;
         private float _shurikenCooldownTimer;
 
+        // Shuriken charge state
+        private bool _isChargingShuriken;
+        private float _chargeStartTime;
+        private GameObject _chargeIndicatorGO;
+        private SpriteRenderer _chargeIndicatorSR;
+
         /// <summary>
         /// Modifica la velocidad temporalmente (power-up o trampa de lentitud)
         /// </summary>
@@ -647,11 +689,19 @@ namespace BIT.Player
         // SHURIKEN MANUAL — Clic derecho
         // ====================================================================
 
-        void ThrowShuriken()
+        // Escala de shuriken cargada por primera vez
+        private static Sprite _cachedShurikenSprite;
+
+        void ThrowShuriken(float chargeT = 0f)
         {
             _shurikenCooldownTimer = shurikenCooldown;
 
             if (Mouse.current == null || Camera.main == null) return;
+
+            // Multiplicadores según nivel de carga (0 = sin carga, 1 = carga máxima)
+            int   finalDamage = Mathf.RoundToInt(shurikenDamage * (1f + chargeT));      // ×1 – ×2
+            float finalSpeed  = shurikenSpeed  * (1f + chargeT * 0.5f);                 // ×1 – ×1.5
+            float finalScale  = 0.5f           * (1f + chargeT * 0.7f);                 // 0.5 – 0.85
 
             Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
             Vector3 mouseWorldPos  = Camera.main.ScreenToWorldPoint(
@@ -660,55 +710,131 @@ namespace BIT.Player
             Vector2 dir = ((Vector2)mouseWorldPos - (Vector2)transform.position).normalized;
 
             var bulletGO = new GameObject("Shuriken");
-            bulletGO.transform.position = transform.position + (Vector3)dir * 0.45f;
+            bulletGO.transform.position = transform.position + (Vector3)dir * 0.5f;
             bulletGO.tag = "Projectile";
 
-            var sr = bulletGO.AddComponent<SpriteRenderer>();
-            sr.color = new Color(0.85f, 0.9f, 1f);
-            sr.sortingOrder = 4;
-            bulletGO.transform.localScale = Vector3.one * 0.18f;
+            // Rotar hacia el cursor
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            bulletGO.transform.rotation = Quaternion.Euler(0f, 0f, angle);
 
-            // Usar sprite real del Shuriken del asset pack
-#if UNITY_EDITOR
-            const string SHURIKEN_SHEET = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken/SpriteSheet.png";
-            var shurikenSprite = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SHURIKEN_SHEET)
-                .OfType<Sprite>().FirstOrDefault();
-            if (shurikenSprite != null) sr.sprite = shurikenSprite;
-#endif
-            if (sr.sprite == null)
+            var sr = bulletGO.AddComponent<SpriteRenderer>();
+            // Color: blanco sin carga → dorado en carga máxima
+            sr.color = Color.Lerp(new Color(0.85f, 0.9f, 1f), new Color(1f, 0.8f, 0.1f), chargeT);
+            sr.sortingOrder = 5;
+            bulletGO.transform.localScale = Vector3.one * finalScale;
+
+            // Cargar sprite del Shuriken (se cachea tras la primera carga)
+            if (_cachedShurikenSprite == null)
             {
-                // Fallback procedural si no se carga el asset
-                var tex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
-                var pixels = new Color[256];
-                for (int i = 0; i < 256; i++)
+#if UNITY_EDITOR
+                const string SHEET  = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken/SpriteSheet.png";
+                const string SINGLE = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken.png";
+                _cachedShurikenSprite =
+                    UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SHEET).OfType<Sprite>().FirstOrDefault()
+                    ?? UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SINGLE).OfType<Sprite>().FirstOrDefault();
+#endif
+            }
+
+            if (_cachedShurikenSprite != null)
+            {
+                sr.sprite = _cachedShurikenSprite;
+            }
+            else
+            {
+                // Fallback: estrella de 4 puntas
+                var tex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+                var pixels = new Color[1024];
+                var ctr = new UnityEngine.Vector2(15.5f, 15.5f);
+                for (int i = 0; i < 1024; i++)
                 {
-                    int x = i % 16, y = i / 16;
-                    float dx = Mathf.Abs(x - 7.5f), dy = Mathf.Abs(y - 7.5f);
-                    pixels[i] = (dx + dy <= 5.5f) ? Color.white : Color.clear;
+                    int x = i % 32, y = i / 32;
+                    float dx = x - ctr.x, dy = y - ctr.y;
+                    float dist  = Mathf.Sqrt(dx * dx + dy * dy);
+                    float ang   = Mathf.Atan2(Mathf.Abs(dy), Mathf.Abs(dx));
+                    float rstar = 13f * (1f - 0.5f * Mathf.Sin(ang * 2f));
+                    pixels[i] = dist <= rstar ? Color.white : Color.clear;
                 }
                 tex.SetPixels(pixels);
                 tex.Apply();
-                sr.sprite = Sprite.Create(tex, new Rect(0, 0, 16, 16), Vector2.one * 0.5f, 16f);
-                bulletGO.transform.localScale = Vector3.one * 0.3f;
+                sr.sprite = Sprite.Create(tex, new Rect(0, 0, 32, 32), UnityEngine.Vector2.one * 0.5f, 32f);
             }
 
             var rb = bulletGO.AddComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
             rb.freezeRotation = false;
-            rb.linearVelocity  = dir * shurikenSpeed;
-            rb.angularVelocity = 480f;
+            rb.linearVelocity  = dir * finalSpeed;
+            rb.angularVelocity = 480f + chargeT * 240f;  // Más giro si está cargado
 
             var col = bulletGO.AddComponent<CircleCollider2D>();
             col.isTrigger = true;
             col.radius    = 0.5f;
 
             var bullet = bulletGO.AddComponent<PlayerBullet>();
-            bullet.damage = shurikenDamage;
+            bullet.damage = finalDamage;
 
             Destroy(bulletGO, 4f);
 
             if (BIT.Core.RuntimeGameManager.Instance != null)
                 BIT.Core.RuntimeGameManager.Instance.PlayAttackSound();
+        }
+
+        // ====================================================================
+        // INDICADOR DE CARGA DEL SHURIKEN
+        // ====================================================================
+
+        void InitChargeIndicator()
+        {
+            _chargeIndicatorGO = new GameObject("ShurikenChargeIndicator");
+            _chargeIndicatorGO.transform.SetParent(transform);
+            _chargeIndicatorGO.transform.localPosition = Vector3.zero;
+            _chargeIndicatorSR = _chargeIndicatorGO.AddComponent<SpriteRenderer>();
+            _chargeIndicatorSR.sortingOrder = 15;
+            _chargeIndicatorSR.sprite = CreateRingSprite();
+            _chargeIndicatorGO.transform.localScale = Vector3.zero;
+        }
+
+        void UpdateChargeIndicator(float t)
+        {
+            if (_chargeIndicatorGO == null) return;
+            float scale = Mathf.Lerp(0.4f, 2.0f, t);
+            _chargeIndicatorGO.transform.localScale = Vector3.one * scale;
+            // Amarillo → naranja → rojo según carga
+            _chargeIndicatorSR.color = Color.Lerp(
+                new Color(1f, 1f, 0.2f, 0.45f),
+                new Color(1f, 0.2f, 0.1f, 0.85f), t);
+        }
+
+        void DestroyChargeIndicator()
+        {
+            if (_chargeIndicatorGO != null)
+            {
+                Destroy(_chargeIndicatorGO);
+                _chargeIndicatorGO = null;
+            }
+        }
+
+        static Sprite CreateRingSprite()
+        {
+            int size = 64;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            float center = size * 0.5f;
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dist  = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(center, center));
+                float inner = size * 0.32f;
+                float outer = size * 0.48f;
+                if (dist >= inner && dist <= outer)
+                {
+                    float alpha = 1f - Mathf.Abs(dist - (inner + outer) * 0.5f) / ((outer - inner) * 0.5f);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+                else
+                    tex.SetPixel(x, y, Color.clear);
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, size);
         }
 
         // ====================================================================

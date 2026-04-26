@@ -10,6 +10,7 @@ TagManager:
   - Health
   - Hazard
   - Projectile
+  - Pickup
   layers:
   - Default
   - TransparentFX

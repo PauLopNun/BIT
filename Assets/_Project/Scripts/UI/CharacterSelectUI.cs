@@ -67,21 +67,21 @@ namespace BIT.UI
                 MakeCharacter(
                     "Ninja Azul", "Equilibrado — Bueno en todo.",
                     new Color(0.35f, 0.65f, 1f),
-                    maxHealth: 100, speed: 6f, damage: 22, cooldown: 0.3f,
+                    maxHealth: 100, speed: 6f, damage: 30, cooldown: 0.28f,
                     dashSpeed: 18f, dashDur: 0.18f, dashCD: 3f,
                     spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaBlue/SeparateAnim/Idle.png"),
 
                 MakeCharacter(
                     "Ninja Rojo", "Guerrero — Alto daño, más lento.",
                     new Color(1f, 0.25f, 0.25f),
-                    maxHealth: 80, speed: 5f, damage: 40, cooldown: 0.5f,
+                    maxHealth: 80, speed: 5f, damage: 50, cooldown: 0.45f,
                     dashSpeed: 22f, dashDur: 0.22f, dashCD: 4f,
                     spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaRed/SeparateAnim/Idle.png"),
 
                 MakeCharacter(
                     "Ninja Verde", "Explorador — Rápido, más resistente.",
                     new Color(0.2f, 0.9f, 0.4f),
-                    maxHealth: 140, speed: 8.5f, damage: 15, cooldown: 0.22f,
+                    maxHealth: 140, speed: 8.5f, damage: 22, cooldown: 0.20f,
                     dashSpeed: 24f, dashDur: 0.15f, dashCD: 2f,
                     spritePath: "Assets/_Project/Sprites/Ninja Adventure/Actor/Character/NinjaGreen/SeparateAnim/Idle.png"),
             };
@@ -101,7 +101,7 @@ namespace BIT.UI
             d.moveSpeed     = speed;
             d.meleeDamage   = damage;
             d.attackCooldown = cooldown;
-            d.meleeRange    = 1.2f;
+            d.meleeRange    = 2.0f;
             d.dashSpeed     = dashSpeed;
             d.dashDuration  = dashDur;
             d.dashCooldown  = dashCD;

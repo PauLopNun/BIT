@@ -50,7 +50,8 @@ namespace BIT.Core
 
         void LoadVFXSprites()
         {
-            // Los sprites se cargan desde el NinjaAdventureSetup
+            LoadSlashSprites();
+            LoadKatanaSprites();
             Debug.Log("[VFXManager] Sistema VFX inicializado");
         }
 
@@ -75,52 +76,88 @@ namespace BIT.Core
             }
         }
 
-        // Cache de sprites de katana
+        // Cache de sprites de VFX de melee
         private Sprite[] _katanaSprites;
         private bool _katanaLoaded;
+        private Sprite[] _circularSlashSprites;
+        private bool _slashLoaded;
 
         /// <summary>
-        /// Animación de espada usando el Katana.png real del asset pack
+        /// Animación de espada usando sprites del asset pack (CircularSlash o Katana como fallback)
         /// </summary>
         public void SpawnMeleeSwordSwing(Vector3 playerPos, Vector2 direction)
         {
             if (!gameObject.activeInHierarchy) return;
-            StartCoroutine(KatanaSwingEffect(playerPos, direction));
+            StartCoroutine(MeleeSlashEffect(playerPos, direction));
         }
 
-        IEnumerator KatanaSwingEffect(Vector3 playerPos, Vector2 direction)
+        IEnumerator MeleeSlashEffect(Vector3 playerPos, Vector2 direction)
         {
+            if (!_slashLoaded)  LoadSlashSprites();
             if (!_katanaLoaded) LoadKatanaSprites();
 
             float baseAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
 
-            if (_katanaSprites != null && _katanaSprites.Length > 0)
+            // Prioridad: CircularSlash FX > Katana weapon > procedural
+            Sprite[] sprites = null;
+            float scale = 6f;
+
+            if (_circularSlashSprites != null && _circularSlashSprites.Length > 0)
             {
-                // Overlay con sprite real de Katana.png (16 frames)
-                var go = new GameObject("KatanaOverlay");
-                go.transform.position = playerPos + (Vector3)direction * 0.6f;
+                sprites = _circularSlashSprites;
+                scale = 6f;   // FX sprites suelen tener PPU=16 → 1 unidad → escala visual grande
+            }
+            else if (_katanaSprites != null && _katanaSprites.Length > 0)
+            {
+                sprites = _katanaSprites;
+                scale = 14f;  // weapon sprites tienen PPU=100 → necesitan más escala
+            }
+
+            if (sprites != null && sprites.Length > 0)
+            {
+                var go = new GameObject("MeleeSlashVFX");
+                go.transform.position = playerPos + (Vector3)direction * 0.7f;
                 go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle - 90f);
-                go.transform.localScale = Vector3.one * 4f;
+                go.transform.localScale = Vector3.one * scale;
 
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sortingOrder = 25;
+                sr.sortingOrder = 100;   // Por encima de tiles, player y UI del juego
 
-                int frames = Mathf.Min(_katanaSprites.Length, 10);
+                int frames = Mathf.Min(sprites.Length, 8);
                 for (int i = 0; i < frames; i++)
                 {
                     if (go == null) yield break;
-                    sr.sprite = _katanaSprites[i];
-                    float alpha = 1f - (float)i / frames * 0.8f;
+                    sr.sprite = sprites[i];
+                    float alpha = 1f - (float)i / frames;
                     sr.color = new Color(1f, 1f, 1f, alpha);
-                    yield return new WaitForSeconds(0.05f);
+                    yield return new WaitForSeconds(0.04f);
                 }
                 if (go != null) Destroy(go);
             }
             else
             {
-                // Fallback procedural en abanico
                 yield return StartCoroutine(ProceduralSwordSwing(playerPos, baseAngle));
             }
+        }
+
+        void LoadSlashSprites()
+        {
+            _slashLoaded = true;
+#if UNITY_EDITOR
+            const string PATH = "Assets/_Project/Sprites/Ninja Adventure/FX/Attack/CircularSlash/SpriteSheet.png";
+            _circularSlashSprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(PATH)
+                .OfType<Sprite>()
+                .OrderBy(s =>
+                {
+                    int i = s.name.LastIndexOf('_');
+                    return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999;
+                })
+                .ToArray();
+            if (_circularSlashSprites != null && _circularSlashSprites.Length > 0)
+                Debug.Log($"[VFXManager] CircularSlash sprites cargados: {_circularSlashSprites.Length}");
+            else
+                Debug.LogWarning("[VFXManager] CircularSlash/SpriteSheet.png no encontrado — probando Katana");
+#endif
         }
 
         void LoadKatanaSprites()

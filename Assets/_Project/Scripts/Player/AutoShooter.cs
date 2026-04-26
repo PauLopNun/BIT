@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Linq;
 using BIT.Player;
 
 namespace BIT.Player
@@ -67,11 +68,15 @@ namespace BIT.Player
             bulletGO.transform.position = transform.position + (Vector3)dir * 0.4f;
             bulletGO.tag = "Projectile";
 
+            // Rotar hacia el objetivo
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            bulletGO.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+
             var sr = bulletGO.AddComponent<SpriteRenderer>();
             sr.sprite = GetBulletSprite();
             sr.color = new Color(0.9f, 1f, 0.2f);
             sr.sortingOrder = 4;
-            bulletGO.transform.localScale = Vector3.one * 0.25f;
+            bulletGO.transform.localScale = Vector3.one * 0.45f;
 
             var rb = bulletGO.AddComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
@@ -92,14 +97,37 @@ namespace BIT.Player
         {
             if (_bulletSprite != null) return _bulletSprite;
 
+            // Intentar cargar el sprite de Kunai del asset pack
+#if UNITY_EDITOR
+            const string KUNAI_PATH = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Kunai.png";
+            var loaded = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(KUNAI_PATH).OfType<Sprite>().FirstOrDefault();
+            if (loaded != null)
+            {
+                _bulletSprite = loaded;
+                return _bulletSprite;
+            }
+            // Fallback: hoja de kunai animada
+            const string KUNAI_SHEET = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Kunai/SpriteSheet.png";
+            loaded = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(KUNAI_SHEET).OfType<Sprite>().FirstOrDefault();
+            if (loaded != null)
+            {
+                _bulletSprite = loaded;
+                return _bulletSprite;
+            }
+#endif
+            // Fallback procedural: estrella de 4 puntas
             var tex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
             var pixels = new Color[1024];
             var center = new Vector2(15.5f, 15.5f);
             for (int i = 0; i < 1024; i++)
             {
                 int x = i % 32, y = i / 32;
-                pixels[i] = Vector2.Distance(new Vector2(x, y), center) <= 15f
-                    ? Color.white : Color.clear;
+                float dx = x - center.x, dy = y - center.y;
+                float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                float angle = Mathf.Atan2(Mathf.Abs(dy), Mathf.Abs(dx));
+                // Forma de estrella / rombo
+                float starRadius = 13f * (1f - 0.5f * Mathf.Sin(angle * 2f));
+                pixels[i] = dist <= starRadius ? Color.white : Color.clear;
             }
             tex.SetPixels(pixels);
             tex.Apply();
