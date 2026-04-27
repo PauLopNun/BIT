@@ -418,6 +418,7 @@ MonoBehaviour:
   shurikenDamage: 20
   shurikenSpeed: 14
   shurikenCooldown: 0.45
+  maxChargeTime: 1.5
   dashSpeed: 18
   dashDuration: 0.18
   dashCooldown: 3

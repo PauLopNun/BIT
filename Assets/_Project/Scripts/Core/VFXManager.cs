@@ -105,7 +105,7 @@ namespace BIT.Core
             if (_circularSlashSprites != null && _circularSlashSprites.Length > 0)
             {
                 sprites = _circularSlashSprites;
-                scale = 6f;   // FX sprites suelen tener PPU=16 → 1 unidad → escala visual grande
+                scale = 2.5f; // 32px / PPU16 = 2u × 2.5 = 5u diámetro ≈ meleeRange×2
             }
             else if (_katanaSprites != null && _katanaSprites.Length > 0)
             {
