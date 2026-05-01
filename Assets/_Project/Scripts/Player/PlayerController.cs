@@ -640,7 +640,7 @@ namespace BIT.Player
         private float _dashCooldownTimer;
         private float _shurikenCooldownTimer;
 
-        // Shuriken charge state
+        // Kunai charge state
         private bool _isChargingShuriken;
         private float _chargeStartTime;
         private GameObject _chargeIndicatorGO;
@@ -686,11 +686,10 @@ namespace BIT.Player
         }
 
         // ====================================================================
-        // SHURIKEN MANUAL — Clic derecho
+        // KUNAI MANUAL — Clic derecho
         // ====================================================================
 
-        // Escala de shuriken cargada por primera vez
-        private static Sprite _cachedShurikenSprite;
+        private static Sprite _cachedKunaiSprite;
 
         void ThrowShuriken(float chargeT = 0f)
         {
@@ -709,13 +708,13 @@ namespace BIT.Player
             mouseWorldPos.z = 0f;
             Vector2 dir = ((Vector2)mouseWorldPos - (Vector2)transform.position).normalized;
 
-            var bulletGO = new GameObject("Shuriken");
+            var bulletGO = new GameObject("Kunai");
             bulletGO.transform.position = transform.position + (Vector3)dir * 0.5f;
             bulletGO.tag = "Projectile";
 
-            // Rotar hacia el cursor
+            // Rotar la punta del kunai hacia el cursor (sprite apunta hacia arriba → -90°)
             float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-            bulletGO.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+            bulletGO.transform.rotation = Quaternion.Euler(0f, 0f, angle - 90f);
 
             var sr = bulletGO.AddComponent<SpriteRenderer>();
             // Color: blanco sin carga → dorado en carga máxima
@@ -723,47 +722,45 @@ namespace BIT.Player
             sr.sortingOrder = 5;
             bulletGO.transform.localScale = Vector3.one * finalScale;
 
-            // Cargar sprite del Shuriken (se cachea tras la primera carga)
-            if (_cachedShurikenSprite == null)
+            // Cargar sprite del Kunai (se cachea tras la primera carga)
+            if (_cachedKunaiSprite == null)
             {
 #if UNITY_EDITOR
-                const string SHEET  = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken/SpriteSheet.png";
-                const string SINGLE = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken.png";
-                _cachedShurikenSprite =
+                const string SHEET  = "Assets/_Project/Sprites/Ninja Adventure/Items/Projectile/Kunai/SpriteSheet.png";
+                const string SINGLE = "Assets/_Project/Sprites/Ninja Adventure/Items/Projectile/Kunai.png";
+                _cachedKunaiSprite =
                     UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SHEET).OfType<Sprite>().FirstOrDefault()
                     ?? UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SINGLE).OfType<Sprite>().FirstOrDefault();
 #endif
             }
 
-            if (_cachedShurikenSprite != null)
+            if (_cachedKunaiSprite != null)
             {
-                sr.sprite = _cachedShurikenSprite;
+                sr.sprite = _cachedKunaiSprite;
             }
             else
             {
-                // Fallback: estrella de 4 puntas
-                var tex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
-                var pixels = new Color[1024];
-                var ctr = new UnityEngine.Vector2(15.5f, 15.5f);
-                for (int i = 0; i < 1024; i++)
+                // Fallback: rombo/daga simple
+                var tex = new Texture2D(16, 32, TextureFormat.RGBA32, false);
+                var pixels = new Color[512];
+                for (int i = 0; i < 512; i++)
                 {
-                    int x = i % 32, y = i / 32;
-                    float dx = x - ctr.x, dy = y - ctr.y;
-                    float dist  = Mathf.Sqrt(dx * dx + dy * dy);
-                    float ang   = Mathf.Atan2(Mathf.Abs(dy), Mathf.Abs(dx));
-                    float rstar = 13f * (1f - 0.5f * Mathf.Sin(ang * 2f));
-                    pixels[i] = dist <= rstar ? Color.white : Color.clear;
+                    int x = i % 16, y = i / 16;
+                    float cx = 7.5f, cy = 15.5f;
+                    float dx = Mathf.Abs(x - cx), dy = y - 4f;
+                    bool inBlade = dy >= 0 && dy <= 24 && dx <= (24 - dy) * 0.3f;
+                    bool inHandle = y >= 0 && y < 6 && dx <= 2.5f;
+                    pixels[i] = (inBlade || inHandle) ? Color.white : Color.clear;
                 }
                 tex.SetPixels(pixels);
                 tex.Apply();
-                sr.sprite = Sprite.Create(tex, new Rect(0, 0, 32, 32), UnityEngine.Vector2.one * 0.5f, 32f);
+                sr.sprite = Sprite.Create(tex, new Rect(0, 0, 16, 32), new UnityEngine.Vector2(0.5f, 0.5f), 32f);
             }
 
             var rb = bulletGO.AddComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
-            rb.freezeRotation = false;
+            rb.freezeRotation = true;   // El kunai vuela recto sin girar
             rb.linearVelocity  = dir * finalSpeed;
-            rb.angularVelocity = 480f + chargeT * 240f;  // Más giro si está cargado
 
             var col = bulletGO.AddComponent<CircleCollider2D>();
             col.isTrigger = true;

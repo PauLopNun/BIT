@@ -77,14 +77,11 @@ namespace BIT.Core
         }
 
         // Cache de sprites de VFX de melee
-        private Sprite[] _katanaSprites;
-        private bool _katanaLoaded;
-        private Sprite[] _circularSlashSprites;
-        private bool _slashLoaded;
+        private Sprite   _katanaInHandSprite;
+        private bool     _katanaLoaded;
+        private Sprite[] _slashCurvedSprites;
+        private bool     _slashLoaded;
 
-        /// <summary>
-        /// Animación de espada usando sprites del asset pack (CircularSlash o Katana como fallback)
-        /// </summary>
         public void SpawnMeleeSwordSwing(Vector3 playerPos, Vector2 direction)
         {
             if (!gameObject.activeInHierarchy) return;
@@ -98,36 +95,28 @@ namespace BIT.Core
 
             float baseAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
 
-            // Prioridad: CircularSlash FX > Katana weapon > procedural
-            Sprite[] sprites = null;
-            float scale = 6f;
-
-            if (_circularSlashSprites != null && _circularSlashSprites.Length > 0)
+            // Mostrar la Katana en mano durante el swing
+            if (_katanaInHandSprite != null)
             {
-                sprites = _circularSlashSprites;
-                scale = 2.5f; // 32px / PPU16 = 2u × 2.5 = 5u diámetro ≈ meleeRange×2
-            }
-            else if (_katanaSprites != null && _katanaSprites.Length > 0)
-            {
-                sprites = _katanaSprites;
-                scale = 14f;  // weapon sprites tienen PPU=100 → necesitan más escala
+                StartCoroutine(SwingKatanaSprite(playerPos, direction, baseAngle));
             }
 
-            if (sprites != null && sprites.Length > 0)
+            // Animar el slash con SlashCurved o fallback procedural
+            if (_slashCurvedSprites != null && _slashCurvedSprites.Length > 0)
             {
-                var go = new GameObject("MeleeSlashVFX");
-                go.transform.position = playerPos + (Vector3)direction * 0.7f;
+                var go = new GameObject("KatanaSlashVFX");
+                go.transform.position = playerPos + (Vector3)direction * 0.8f;
                 go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle - 90f);
-                go.transform.localScale = Vector3.one * scale;
+                go.transform.localScale = Vector3.one * 3f;
 
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sortingOrder = 100;   // Por encima de tiles, player y UI del juego
+                sr.sortingOrder = 100;
 
-                int frames = Mathf.Min(sprites.Length, 8);
+                int frames = Mathf.Min(_slashCurvedSprites.Length, 8);
                 for (int i = 0; i < frames; i++)
                 {
                     if (go == null) yield break;
-                    sr.sprite = sprites[i];
+                    sr.sprite = _slashCurvedSprites[i];
                     float alpha = 1f - (float)i / frames;
                     sr.color = new Color(1f, 1f, 1f, alpha);
                     yield return new WaitForSeconds(0.04f);
@@ -140,23 +129,57 @@ namespace BIT.Core
             }
         }
 
+        IEnumerator SwingKatanaSprite(Vector3 playerPos, Vector2 direction, float baseAngle)
+        {
+            var go = new GameObject("KatanaWeaponVFX");
+            go.transform.position = playerPos + (Vector3)direction * 0.6f;
+            go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle - 90f);
+            go.transform.localScale = Vector3.one * 1.2f;
+
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = _katanaInHandSprite;
+            sr.sortingOrder = 101;
+
+            float duration = 0.22f;
+            float elapsed  = 0f;
+            float swingArc = 70f;
+            Vector3 startEuler = go.transform.eulerAngles;
+
+            while (elapsed < duration && go != null)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                go.transform.eulerAngles = startEuler + new Vector3(0f, 0f, -swingArc * t);
+                go.transform.position = playerPos + (Vector3)direction * (0.6f + t * 0.3f);
+                sr.color = new Color(1f, 1f, 1f, 1f - t * 0.6f);
+                yield return null;
+            }
+            if (go != null) Destroy(go);
+        }
+
         void LoadSlashSprites()
         {
             _slashLoaded = true;
 #if UNITY_EDITOR
-            const string PATH = "Assets/_Project/Sprites/Ninja Adventure/FX/Attack/CircularSlash/SpriteSheet.png";
-            _circularSlashSprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(PATH)
-                .OfType<Sprite>()
-                .OrderBy(s =>
+            // Prioridad: SlashCurved (animación de katana) → Cut → CircularSlash
+            string[] paths = {
+                "Assets/_Project/Sprites/Ninja Adventure/FX/Attack/SlashCurved/SpriteSheet.png",
+                "Assets/_Project/Sprites/Ninja Adventure/FX/Attack/Cut/SpriteSheet.png",
+                "Assets/_Project/Sprites/Ninja Adventure/FX/Attack/CircularSlash/SpriteSheet.png",
+            };
+            foreach (var path in paths)
+            {
+                _slashCurvedSprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path)
+                    .OfType<Sprite>()
+                    .OrderBy(s => { int i = s.name.LastIndexOf('_'); return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999; })
+                    .ToArray();
+                if (_slashCurvedSprites != null && _slashCurvedSprites.Length > 0)
                 {
-                    int i = s.name.LastIndexOf('_');
-                    return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999;
-                })
-                .ToArray();
-            if (_circularSlashSprites != null && _circularSlashSprites.Length > 0)
-                Debug.Log($"[VFXManager] CircularSlash sprites cargados: {_circularSlashSprites.Length}");
-            else
-                Debug.LogWarning("[VFXManager] CircularSlash/SpriteSheet.png no encontrado — probando Katana");
+                    Debug.Log($"[VFXManager] Katana slash sprites cargados: {_slashCurvedSprites.Length}");
+                    return;
+                }
+            }
+            Debug.LogWarning("[VFXManager] Slash sprites no encontrados — usando VFX procedural");
 #endif
         }
 
@@ -164,19 +187,16 @@ namespace BIT.Core
         {
             _katanaLoaded = true;
 #if UNITY_EDITOR
-            const string PATH = "Assets/_Project/Sprites/Ninja Adventure/Actor/CharacterAnimated/Weapon/Katana.png";
-            _katanaSprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(PATH)
-                .OfType<Sprite>()
-                .OrderBy(s =>
-                {
-                    int i = s.name.LastIndexOf('_');
-                    return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999;
-                })
-                .ToArray();
-            if (_katanaSprites != null && _katanaSprites.Length > 0)
-                Debug.Log($"[VFXManager] Katana sprites cargados: {_katanaSprites.Length}");
+            // Cargar SpriteInHand de la Katana del item pack
+            const string IN_HAND = "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Katana/SpriteInHand.png";
+            const string SPRITE  = "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Katana/Sprite.png";
+            _katanaInHandSprite =
+                UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(IN_HAND)
+                ?? UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(SPRITE);
+            if (_katanaInHandSprite != null)
+                Debug.Log("[VFXManager] Katana SpriteInHand cargado");
             else
-                Debug.LogWarning("[VFXManager] Katana.png no encontrado — usando VFX procedural");
+                Debug.LogWarning("[VFXManager] Katana SpriteInHand.png no encontrado");
 #endif
         }
 
