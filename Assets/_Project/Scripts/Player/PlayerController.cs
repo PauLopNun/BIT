@@ -73,7 +73,7 @@ namespace BIT.Player
 
         [Header("=== SHURIKEN (Clic Derecho) ===")]
         [Tooltip("Daño del shuriken manual (sin carga)")]
-        public int shurikenDamage = 28;
+        public int shurikenDamage = 30;
         [Tooltip("Velocidad del shuriken lanzado")]
         public float shurikenSpeed = 14f;
         [Tooltip("Cooldown entre shurikens manuales (segundos)")]
@@ -429,17 +429,13 @@ namespace BIT.Player
                     {
                         if (spriteRenderer == null) break;
                         spriteRenderer.sprite = frame;
-                        spriteRenderer.color = new Color(1f, 0.6f, 0.2f);
                         yield return new WaitForSeconds(0.1f);
-                        if (spriteRenderer != null) spriteRenderer.color = _baseColor;
                     }
                 }
             }
             else
             {
-                if (spriteRenderer != null) spriteRenderer.color = new Color(1f, 0.5f, 0.1f);
                 yield return new WaitForSeconds(0.15f);
-                if (spriteRenderer != null) spriteRenderer.color = _baseColor;
             }
 
             _isAttackingAnim = false;
@@ -702,7 +698,7 @@ namespace BIT.Player
             if (Mouse.current == null || Camera.main == null) return;
 
             // Multiplicadores según nivel de carga (0 = sin carga, 1 = carga máxima)
-            int   finalDamage = Mathf.RoundToInt(shurikenDamage * (1f + chargeT));      // ×1 – ×2
+            int   finalDamage = Mathf.RoundToInt(shurikenDamage * (1f + chargeT * 3f));  // ×1 – ×4
             float finalSpeed  = shurikenSpeed  * (1f + chargeT * 0.5f);                 // ×1 – ×1.5
             float finalScale  = 1.0f           * (1f + chargeT * 0.3f);                 // 1.0 – 1.3
 

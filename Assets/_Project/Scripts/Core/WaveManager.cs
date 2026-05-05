@@ -49,7 +49,7 @@ namespace BIT.Core
         [SerializeField] private GameObject _rangedEnemyPrefab;
 
         [Tooltip("Ronda a partir de la cual aparecen enemigos a distancia")]
-        [SerializeField] private int _rangedEnemyUnlockWave = 2;
+        [SerializeField] private int _rangedEnemyUnlockWave = 4;
 
         [Header("=== BOSS ===")]
         [Tooltip("Prefab del boss (si está vacío se usa el enemigo fuerte con stats escalados x8)")]
@@ -60,19 +60,19 @@ namespace BIT.Core
 
         [Header("=== DIFICULTAD ===")]
         [Tooltip("Enemigos en la primera oleada")]
-        [SerializeField] private int _baseEnemyCount = 3;
+        [SerializeField] private int _baseEnemyCount = 2;
 
         [Tooltip("Enemigos extra añadidos por cada ronda")]
-        [SerializeField] private int _enemiesPerRoundIncrease = 2;
+        [SerializeField] private int _enemiesPerRoundIncrease = 1;
 
         [Tooltip("Ronda a partir de la cual aparecen enemigos rápidos")]
-        [SerializeField] private int _fastEnemyUnlockWave = 3;
+        [SerializeField] private int _fastEnemyUnlockWave = 4;
 
         [Tooltip("Ronda a partir de la cual aparecen enemigos fuertes")]
-        [SerializeField] private int _tankEnemyUnlockWave = 5;
+        [SerializeField] private int _tankEnemyUnlockWave = 7;
 
-        [Tooltip("Cada cuántas rondas hay una 'Horda' (doble de enemigos)")]
-        [SerializeField] private int _hordeEveryNWaves = 5;
+        [Tooltip("Cada cuántas rondas hay una 'Horda' (x1.5 enemigos). 0 = desactivado")]
+        [SerializeField] private int _hordeEveryNWaves = 8;
 
         [Header("=== SPAWNING ===")]
         [Tooltip("Puntos de spawn (si están vacíos, se usan posiciones aleatorias)")]
@@ -113,6 +113,7 @@ namespace BIT.Core
         public int CurrentWave => _currentWave;
         public bool WaveActive => _waveActive;
         public int AliveEnemyCount => CountAliveEnemies();
+        public bool LastWaveWasBoss => _bossEveryNWaves > 0 && _currentWave % _bossEveryNWaves == 0;
 
         // Evento para que la UI escuche
         public event System.Action<int> OnWaveStarted;
@@ -321,13 +322,17 @@ namespace BIT.Core
         /// <summary>Calcula cuántos enemigos spawnear en la oleada actual.</summary>
         private int CalculateEnemyCount()
         {
-            int count = _baseEnemyCount + (_currentWave - 1) * _enemiesPerRoundIncrease;
+            // Curva no lineal: arranca con fuerza y crece más despacio
+            // wave 1=5, 2=8, 4=10, 5=11, 7=12, 8=13, 10+=14 (cap)
+            int count;
+            if (_currentWave == 1)      count = 5;
+            else if (_currentWave == 2) count = 8;
+            else                        count = Mathf.Min(14, 8 + (_currentWave - 2));
 
-            // Las oleadas de boss tienen prioridad — no son horda
             bool isBossWave = _bossEveryNWaves > 0 && _currentWave % _bossEveryNWaves == 0;
-            if (!isBossWave && _currentWave % _hordeEveryNWaves == 0)
+            if (!isBossWave && _hordeEveryNWaves > 0 && _currentWave % _hordeEveryNWaves == 0)
             {
-                count *= 2;
+                count = Mathf.RoundToInt(count * 1.5f);
                 Debug.Log($"[WaveManager] ¡OLEADA HORDA! Enemigos: {count}");
                 UIManager.Instance?.ShowWaveMessage($"¡¡HORDA!! RONDA {_currentWave}", isStart: true);
             }
@@ -382,8 +387,14 @@ namespace BIT.Core
             Vector3 spawnPos = GetSpawnPosition();
             GameObject enemy;
 
-            // 25% chance of spawning a ranged enemy once unlocked
-            if (_currentWave >= _rangedEnemyUnlockWave && Random.value < 0.25f)
+            float roll = Random.value;
+            // 20% chance de enemigo pesado (Cyclope) desde ronda 5
+            if (_currentWave >= 5 && roll < 0.20f)
+            {
+                enemy = CreateHeavyEnemyAtRuntime(spawnPos);
+            }
+            // 20% chance de enemigo a distancia desde ronda desbloqueada
+            else if (_currentWave >= _rangedEnemyUnlockWave && roll < 0.40f)
             {
                 enemy = _rangedEnemyPrefab != null
                     ? Instantiate(_rangedEnemyPrefab, spawnPos, Quaternion.identity)
@@ -424,9 +435,16 @@ namespace BIT.Core
                 go = Instantiate(basePrefab, pos, Quaternion.identity);
                 go.name = "Enemy_Ranged";
 
-                // Blue-purple tint to distinguish from normal melee enemies
+                // Sprite de Flam (calavera de fuego) para diferenciarlo visualmente
                 var sr = go.GetComponent<SpriteRenderer>();
-                if (sr != null) sr.color = new Color(0.45f, 0.65f, 1f);
+                if (sr != null)
+                {
+                    Sprite flamSprite = LoadFirstAvailableSprite(
+                        "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Flam/SpriteSheet.png",
+                        "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Flam2/SpriteSheet.png");
+                    if (flamSprite != null) { sr.sprite = flamSprite; sr.color = Color.white; }
+                    else sr.color = new Color(1f, 0.5f, 0.1f); // naranja como fallback
+                }
 
                 // Remove existing melee AI components and add ranged AI
                 var existingEnemyAI = go.GetComponent<BIT.Enemy.EnemyAI>();
@@ -446,7 +464,11 @@ namespace BIT.Core
 
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sortingOrder = 2;
-                sr.color = new Color(0.45f, 0.65f, 1f);
+                Sprite flamFallback = LoadFirstAvailableSprite(
+                    "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Flam/SpriteSheet.png",
+                    "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Flam2/SpriteSheet.png");
+                if (flamFallback != null) { sr.sprite = flamFallback; sr.color = Color.white; }
+                else sr.color = new Color(1f, 0.5f, 0.1f);
 
                 var rb = go.AddComponent<Rigidbody2D>();
                 rb.gravityScale = 0f;
@@ -468,6 +490,42 @@ namespace BIT.Core
                 if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.40f);
                 if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.70f);
             }
+
+            return go;
+        }
+
+        private GameObject CreateHeavyEnemyAtRuntime(Vector3 pos)
+        {
+            GameObject basePrefab = _tankEnemyPrefab ?? _basicEnemyPrefab;
+            GameObject go = basePrefab != null
+                ? Instantiate(basePrefab, pos, Quaternion.identity)
+                : new GameObject("Enemy_Heavy") { tag = "Enemy" };
+
+            go.name = "Enemy_Heavy";
+            go.transform.position = pos;
+            go.transform.localScale = Vector3.one * 1.3f;
+
+            var sr = go.GetComponent<SpriteRenderer>() ?? go.AddComponent<SpriteRenderer>();
+            Sprite heavySprite = LoadFirstAvailableSprite(
+                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Cyclope/SpriteSheet.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Cyclope2/SpriteSheet.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Bear/SpriteSheet.png");
+            if (heavySprite != null) { sr.sprite = heavySprite; sr.color = Color.white; }
+            else sr.color = new Color(0.6f, 0.3f, 1f);
+
+            // Stats: más vida y daño, más lento
+            var simpleAI = go.GetComponent<SimpleEnemyAI>();
+            if (simpleAI != null)
+            {
+                simpleAI.ScaleStats(2.0f);
+                simpleAI.moveSpeed = Mathf.Max(0.8f, simpleAI.moveSpeed * 0.65f);
+            }
+
+            var dropper = go.GetComponent<BIT.Enemy.EnemyDropper>() ?? go.AddComponent<BIT.Enemy.EnemyDropper>();
+            var heartPrefab = LoadPickupPrefab("Heart");
+            var coinPrefab  = LoadPickupPrefab("Coin");
+            if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.55f);
+            if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.80f);
 
             return go;
         }
@@ -502,7 +560,7 @@ namespace BIT.Core
         private void ScaleEnemyStats(GameObject enemy)
         {
             if (_currentWave <= 1) return;
-            float scaleFactor = 1f + (_currentWave - 1) * 0.15f; // +15% por ronda
+            float scaleFactor = 1f + (_currentWave - 1) * 0.08f; // +8% por ronda (más gradual)
             ScaleEnemyStats(enemy, scaleFactor);
         }
 
@@ -645,25 +703,36 @@ namespace BIT.Core
         }
 
         /// <summary>Aplica sprite y tinte únicos al boss para que se diferencie de los enemigos normales.</summary>
+        // Pool de sprites de boss — cada oleada de boss usa uno distinto en orden
+        private static readonly string[] _bossSpritePool = {
+            "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/TRex/SpriteSheet.png",
+            "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Dragon/SpriteSheet.png",
+            "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Grey Trex/SpriteSheet.png",
+            "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/DragonYellow/SpriteSheet.png",
+            "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Cyclope/SpriteSheet.png",
+            "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/GoldRacoon/SpriteSheet.png",
+        };
+
         private void ApplyBossVisual(GameObject boss)
         {
             var sr = boss.GetComponent<SpriteRenderer>();
             if (sr == null) return;
 
-            // Intentar cargar TRex o Skull — enemigos que NO aparecen en oleadas normales
-            Sprite bossSprite = LoadFirstAvailableSprite(
-                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/TRex/SpriteSheet.png",
-                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Skull/SpriteSheet.png"
-            );
+            // Cada boss usa un sprite diferente según el número de oleada de boss
+            int bossIndex = (_bossEveryNWaves > 0 ? _currentWave / _bossEveryNWaves : 1) - 1;
+            string path = _bossSpritePool[bossIndex % _bossSpritePool.Length];
+
+            Sprite bossSprite = LoadFirstAvailableSprite(path,
+                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/TRex/SpriteSheet.png");
 
             if (bossSprite != null)
             {
                 sr.sprite = bossSprite;
-                sr.color = Color.white; // sprite propio, sin tinte
+                sr.color = Color.white;
             }
             else
             {
-                sr.color = new Color(1f, 0.35f, 0.1f); // naranja-rojo si no carga sprite
+                sr.color = new Color(1f, 0.35f, 0.1f);
             }
         }
 

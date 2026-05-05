@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using BIT.Player;
 
 namespace BIT.Core
@@ -66,13 +67,121 @@ namespace BIT.Core
 
         void OnWaveCleared(int wave)
         {
-            StartCoroutine(ShowShopDelayed());
+            bool wasBoss = WaveManager.Instance != null && WaveManager.Instance.LastWaveWasBoss;
+            StartCoroutine(wasBoss ? ShowBossRewardDelayed() : ShowShopDelayed());
         }
 
         IEnumerator ShowShopDelayed()
         {
             yield return new WaitForSeconds(2f);
             ShowShop();
+        }
+
+        IEnumerator ShowBossRewardDelayed()
+        {
+            yield return new WaitForSeconds(2.5f);
+            ShowBossReward();
+        }
+
+        void ShowBossReward()
+        {
+            if (_player == null) _player = FindFirstObjectByType<PlayerController>();
+            if (_player == null || _shopPanel == null) return;
+
+            Time.timeScale = 0f;
+
+            var all = AllUpgrades();
+            var chosen = new List<UpgradeOption>();
+            while (chosen.Count < 2 && all.Count > 0)
+            {
+                int idx = Random.Range(0, all.Count);
+                chosen.Add(all[idx]);
+                all.RemoveAt(idx);
+            }
+
+            foreach (Transform child in _shopPanel.transform)
+                Destroy(child.gameObject);
+            _cards.Clear();
+
+            int wave = WaveManager.Instance != null ? WaveManager.Instance.CurrentWave : 1;
+            CreateLabel("¡RECOMPENSA DE BOSS!", 38, new Color(1f, 0.75f, 0f), new Vector2(0f, 0.87f), new Vector2(1f, 1f));
+            CreateLabel("¡Elige UNA mejora GRATIS por derrotar al boss!", 18,
+                new Color(0.85f, 0.85f, 0.85f), new Vector2(0f, 0.79f), new Vector2(1f, 0.87f));
+
+            float totalSpacing = 1f - chosen.Count * 0.30f;
+            float gap = totalSpacing / (chosen.Count + 1);
+            for (int i = 0; i < chosen.Count; i++)
+            {
+                float xMin = gap + i * (0.30f + gap);
+                CreateBossRewardCard(chosen[i], xMin, xMin + 0.30f);
+            }
+
+            CreateNextRoundButton();
+            _shopPanel.SetActive(true);
+        }
+
+        void CreateBossRewardCard(UpgradeOption option, float xMin, float xMax)
+        {
+            var card = new GameObject("BossRewardCard");
+            card.transform.SetParent(_shopPanel.transform, false);
+
+            var bg = card.AddComponent<Image>();
+            bg.color = new Color(0.10f, 0.08f, 0.04f, 0.97f);
+
+            var btn = card.AddComponent<Button>();
+            var colors = btn.colors;
+            colors.highlightedColor = new Color(0.35f, 0.28f, 0.08f);
+            colors.pressedColor     = new Color(0.55f, 0.45f, 0.10f);
+            btn.colors = colors;
+
+            var cardRT = card.GetComponent<RectTransform>();
+            cardRT.anchorMin = new Vector2(xMin, 0.13f);
+            cardRT.anchorMax = new Vector2(xMax, 0.72f);
+            cardRT.offsetMin = new Vector2(6, 6);
+            cardRT.offsetMax = new Vector2(-6, -6);
+
+            var outline = card.AddComponent<Outline>();
+            outline.effectColor    = new Color(1f, 0.75f, 0f, 0.8f);
+            outline.effectDistance = new Vector2(3, -3);
+
+            AddCardText(card, option.name,        20, FontStyles.Bold,   new Color(1f, 0.88f, 0.2f), new Vector2(0f, 0.68f), new Vector2(1f, 1f));
+            AddCardText(card, option.description, 16, FontStyles.Normal, Color.white,                new Vector2(0f, 0.22f), new Vector2(1f, 0.68f));
+            AddCardText(card, "GRATIS",           22, FontStyles.Bold,   new Color(0.3f, 1f, 0.4f), new Vector2(0f, 0f),    new Vector2(1f, 0.22f));
+
+            var entry = new CardEntry
+            {
+                go = card, btn = btn, priceText = null,
+                cost = 0, name = option.name, purchased = false, apply = option.apply,
+            };
+            _cards.Add(entry);
+
+            var captured = entry;
+            btn.onClick.AddListener(() =>
+            {
+                if (captured.purchased) return;
+                captured.purchased = true;
+                captured.apply(_player);
+                var b = captured.go.GetComponent<Image>();
+                if (b != null) b.color = new Color(0.04f, 0.10f, 0.04f, 0.97f);
+                captured.btn.interactable = false;
+                // desactivar las otras cartas (solo una gratis)
+                foreach (var e in _cards)
+                    if (e != captured) e.btn.interactable = false;
+                RuntimeGameManager.Instance?.ShowBigMessage($"¡{captured.name}!", new Color(1f, 0.85f, 0.2f));
+            });
+        }
+
+        static void AddCardText(GameObject parent, string text, int size, FontStyles style,
+            Color color, Vector2 anchorMin, Vector2 anchorMax)
+        {
+            var go = new GameObject("T");
+            go.transform.SetParent(parent.transform, false);
+            var tmp = go.AddComponent<TMPro.TextMeshProUGUI>();
+            tmp.text = text; tmp.fontSize = size; tmp.fontStyle = style;
+            tmp.color = color; tmp.alignment = TMPro.TextAlignmentOptions.Center;
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = anchorMin; rt.anchorMax = anchorMax;
+            rt.offsetMin = new Vector2(5, 4); rt.offsetMax = new Vector2(-5, -4);
         }
 
         List<UpgradeOption> AllUpgrades() => new List<UpgradeOption>
@@ -116,8 +225,18 @@ namespace BIT.Core
 
             int wave = WaveManager.Instance != null ? WaveManager.Instance.CurrentWave : 1;
 
+            // Descuento en rondas tempranas: hay menos enemigos y por tanto menos monedas
+            float priceMultiplier = wave <= 2 ? 0.5f : wave <= 4 ? 0.75f : 1.0f;
+            for (int i = 0; i < chosen.Count; i++)
+            {
+                var opt = chosen[i];
+                opt.cost = Mathf.Max(1, Mathf.RoundToInt(opt.cost * priceMultiplier));
+                chosen[i] = opt;
+            }
+
+            string discountLabel = wave <= 2 ? " — ¡50% descuento!" : wave <= 4 ? " — ¡25% descuento!" : "";
             CreateLabel("¡TIENDA!", 42, new Color(1f, 0.88f, 0.15f), new Vector2(0f, 0.87f), new Vector2(1f, 1f));
-            CreateLabel($"Oleada {wave} superada — gasta tus monedas", 18,
+            CreateLabel($"Oleada {wave} superada — gasta tus monedas{discountLabel}", 18,
                 new Color(0.75f, 0.75f, 0.75f), new Vector2(0f, 0.79f), new Vector2(1f, 0.87f));
 
             // Balance de monedas
