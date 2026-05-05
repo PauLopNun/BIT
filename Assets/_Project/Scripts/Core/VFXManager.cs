@@ -50,7 +50,6 @@ namespace BIT.Core
 
         void LoadVFXSprites()
         {
-            LoadSlashSprites();
             LoadWeaponSprite();
             Debug.Log("[VFXManager] Sistema VFX inicializado");
         }
@@ -76,123 +75,109 @@ namespace BIT.Core
             }
         }
 
-        // Cache de sprites de VFX de melee
-        private Sprite   _weaponInHandSprite;
-        private bool     _weaponLoaded;
-        private Sprite[] _slashCurvedSprites;
-        private bool     _slashLoaded;
+        private Sprite _weaponInHandSprite;
+        private bool   _weaponLoaded;
 
-        public void SpawnMeleeSwordSwing(Vector3 playerPos, Vector2 direction)
+        public void SpawnMeleeSwordSwing(Transform playerTransform, Vector2 direction)
         {
             if (!gameObject.activeInHierarchy) return;
-            StartCoroutine(MeleeSlashEffect(playerPos, direction));
+            StartCoroutine(MeleeSlashEffect(playerTransform, direction));
         }
 
-        IEnumerator MeleeSlashEffect(Vector3 playerPos, Vector2 direction)
+        IEnumerator MeleeSlashEffect(Transform playerTransform, Vector2 direction)
         {
-            if (!_slashLoaded)  LoadSlashSprites();
             if (!_weaponLoaded) LoadWeaponSprite();
 
             float baseAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
 
-            // Lanzar el thrust del arma en paralelo (no bloqueante)
             if (_weaponInHandSprite != null)
-                StartCoroutine(ThrustWeaponSprite(playerPos, direction, baseAngle));
-
-            // Animar el slash FX encima
-            if (_slashCurvedSprites != null && _slashCurvedSprites.Length > 0)
-            {
-                var go = new GameObject("MeleeSlashVFX");
-                go.transform.position = playerPos + (Vector3)direction * 0.9f;
-                go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle - 90f);
-                go.transform.localScale = Vector3.one * 1.2f;
-
-                var sr = go.AddComponent<SpriteRenderer>();
-                sr.sortingOrder = 100;
-
-                int frames = Mathf.Min(_slashCurvedSprites.Length, 8);
-                for (int i = 0; i < frames; i++)
-                {
-                    if (go == null) yield break;
-                    sr.sprite = _slashCurvedSprites[i];
-                    sr.color = new Color(1f, 1f, 1f, 1f - (float)i / frames);
-                    yield return new WaitForSeconds(0.04f);
-                }
-                if (go != null) Destroy(go);
-            }
+                yield return StartCoroutine(SwingWeaponSprite(playerTransform, baseAngle));
             else
-            {
-                yield return StartCoroutine(ProceduralSwordSwing(playerPos, baseAngle));
-            }
+                yield return StartCoroutine(ProceduralSwordSwing(playerTransform.position, baseAngle));
         }
 
-        // El arma sale del personaje hacia adelante y desaparece — sin inventar rotaciones
-        IEnumerator ThrustWeaponSprite(Vector3 playerPos, Vector2 direction, float baseAngle)
+        // La espada sigue al jugador cada frame para no flotar al moverse
+        IEnumerator SwingWeaponSprite(Transform playerTransform, float baseAngle)
         {
-            var go = new GameObject("WeaponThrustVFX");
-            go.transform.position = playerPos + (Vector3)direction * 0.2f;
-            // SpriteInHand de NinjaAdventure apunta hacia abajo en el fichero → +90° lo orienta en dir
-            go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle + 90f);
-            go.transform.localScale = Vector3.one * 1.25f;
-
+            var go = new GameObject("WeaponSwingVFX");
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite      = _weaponInHandSprite;
+            sr.sprite = _weaponInHandSprite;
             sr.sortingOrder = 101;
 
-            float duration   = 0.22f;
-            float thrustDist = 1.2f;   // cuánto avanza hacia adelante
-            float elapsed    = 0f;
+            float duration    = 0.26f;
+            float orbitRadius = 1.2f;
+            float swingArc    = 130f;
 
-            while (elapsed < duration && go != null)
+            float startAngle = baseAngle + swingArc * 0.5f;
+            float endAngle   = baseAngle - swingArc * 0.5f;
+
+            float trailEvery = 0.035f;
+            float lastTrail  = -1f;
+
+            float elapsed = 0f;
+            while (elapsed < duration && go != null && playerTransform != null)
             {
                 elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                // Avanza linealmente; fade out en el último 40%
-                go.transform.position = playerPos + (Vector3)direction * (0.2f + thrustDist * t);
+                float t = Mathf.Clamp01(elapsed / duration);
+                float easedT = 1f - Mathf.Pow(1f - t, 2.5f);
+
+                float currentAngle = Mathf.Lerp(startAngle, endAngle, easedT);
+                float rad = currentAngle * Mathf.Deg2Rad;
+
+                Vector3 playerPos = playerTransform.position;
+                go.transform.position = playerPos + new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f) * orbitRadius;
+                go.transform.rotation = Quaternion.Euler(0f, 0f, currentAngle - 90f);
+
+                float scalePulse = 1f + Mathf.Sin(t * Mathf.PI) * 0.3f;
+                go.transform.localScale = Vector3.one * 6.5f * scalePulse;
+
                 sr.color = new Color(1f, 1f, 1f, t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f);
+
+                // solo trail durante la fase activa, no en el fade-out final
+                if (t < 0.6f && elapsed - lastTrail >= trailEvery)
+                {
+                    lastTrail = elapsed;
+                    StartCoroutine(SwordTrailGhost(
+                        go.transform.position, go.transform.rotation,
+                        go.transform.localScale, _weaponInHandSprite));
+                }
+
                 yield return null;
             }
             if (go != null) Destroy(go);
         }
 
-        void LoadSlashSprites()
+        IEnumerator SwordTrailGhost(Vector3 pos, Quaternion rot, Vector3 scale, Sprite sprite)
         {
-            _slashLoaded = true;
-#if UNITY_EDITOR
-            // Prioridad: SlashCurved (animación de katana) → Cut → CircularSlash
-            string[] paths = {
-                "Assets/_Project/Sprites/Ninja Adventure/FX/Attack/SlashCurved/SpriteSheet.png",
-                "Assets/_Project/Sprites/Ninja Adventure/FX/Attack/Cut/SpriteSheet.png",
-                "Assets/_Project/Sprites/Ninja Adventure/FX/Attack/CircularSlash/SpriteSheet.png",
-            };
-            foreach (var path in paths)
+            var ghost = new GameObject("SwordTrail");
+            ghost.transform.SetPositionAndRotation(pos, rot);
+            ghost.transform.localScale = scale;
+
+            var sr = ghost.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.sortingOrder = 99;
+
+            float duration = 0.14f;
+            float elapsed  = 0f;
+            while (elapsed < duration && ghost != null)
             {
-                _slashCurvedSprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path)
-                    .OfType<Sprite>()
-                    .OrderBy(s => { int i = s.name.LastIndexOf('_'); return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999; })
-                    .ToArray();
-                if (_slashCurvedSprites != null && _slashCurvedSprites.Length > 0)
-                {
-                    Debug.Log($"[VFXManager] Katana slash sprites cargados: {_slashCurvedSprites.Length}");
-                    return;
-                }
+                elapsed += Time.deltaTime;
+                float alpha = (1f - Mathf.Clamp01(elapsed / duration)) * 0.45f;
+                sr.color = new Color(0.85f, 0.95f, 1f, alpha);
+                yield return null;
             }
-            Debug.LogWarning("[VFXManager] Slash sprites no encontrados — usando VFX procedural");
-#endif
+            if (ghost != null) Destroy(ghost);
         }
 
         void LoadWeaponSprite()
         {
             _weaponLoaded = true;
 #if UNITY_EDITOR
-            // Prioridad: Lance2 → Lance → Sword → Katana (cualquiera que esté disponible)
             string[] candidates = {
-                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Lance2/SpriteInHand.png",
-                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Lance/SpriteInHand.png",
-                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Lance2/Sprite.png",
-                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Lance/Sprite.png",
-                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Sword/SpriteInHand.png",
-                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Katana/SpriteInHand.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/BigSword/Sprite.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Sword/Sprite.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Sword2/Sprite.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/BigSword/SpriteInHand.png",
             };
             foreach (var path in candidates)
             {

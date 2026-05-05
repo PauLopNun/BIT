@@ -122,6 +122,8 @@ namespace BIT.Player
         private float _animTimer;
         private int _animFrame;
         private bool _isAttackingAnim;
+        private int _lastDirIndex = -1;
+        private Color _baseColor = Color.white;
 
         // ====================================================================
         // INICIALIZACIÓN
@@ -342,7 +344,6 @@ namespace BIT.Player
 
         void UpdateAnimations()
         {
-            // Pasar velocidad al Animator por si existe uno configurado
             if (animator != null)
             {
                 try
@@ -354,12 +355,22 @@ namespace BIT.Player
                 catch { }
             }
 
-            // Animación por código usando sprites del asset pack
             if (spriteRenderer == null || _isAttackingAnim) return;
 
             bool moving = moveInput.magnitude > 0.1f;
-            Sprite[] frames = moving ? _walkSprites : _idleSprites;
+            Sprite[] allFrames = moving ? _walkSprites : _idleSprites;
+            if (allFrames == null || allFrames.Length == 0) return;
+
+            Sprite[] frames = GetDirectionalFrames(allFrames);
             if (frames == null || frames.Length == 0) return;
+
+            int dirIndex = CurrentDirIndex();
+            if (dirIndex != _lastDirIndex)
+            {
+                _lastDirIndex = dirIndex;
+                _animFrame = 0;
+                _animTimer = 0f;
+            }
 
             float fps = moving ? 10f : 4f;
             _animTimer += Time.deltaTime;
@@ -371,11 +382,35 @@ namespace BIT.Player
             }
         }
 
+        // NinjaAdventure: 4 rows (Down/Left/Right/Up) × N frames por fila
+        int CurrentDirIndex()
+        {
+            float absX = Mathf.Abs(lastMoveDirection.x);
+            float absY = Mathf.Abs(lastMoveDirection.y);
+            if (absX > absY)
+                return lastMoveDirection.x < 0f ? 1 : 2; // 1=Left, 2=Right
+            return lastMoveDirection.y < 0f ? 0 : 3;     // 0=Down, 3=Up
+        }
+
+        Sprite[] GetDirectionalFrames(Sprite[] all)
+        {
+            if (all == null || all.Length < 4) return all;
+            int framesPerDir = all.Length / 4;
+            int start = CurrentDirIndex() * framesPerDir;
+            var result = new Sprite[framesPerDir];
+            for (int i = 0; i < framesPerDir; i++)
+                result[i] = all[start + i];
+            return result;
+        }
+
         void UpdateSpriteDirection()
         {
             if (spriteRenderer == null) return;
-            // Voltear el sprite horizontalmente según la dirección X
-            if (Mathf.Abs(lastMoveDirection.x) > 0.1f)
+            bool hasDirectionalSprites = (_walkSprites != null && _walkSprites.Length >= 4)
+                                      || (_idleSprites != null && _idleSprites.Length >= 4);
+            if (hasDirectionalSprites)
+                spriteRenderer.flipX = false; // las filas del spritesheet ya tienen la dirección
+            else if (Mathf.Abs(lastMoveDirection.x) > 0.1f)
                 spriteRenderer.flipX = lastMoveDirection.x < 0f;
         }
 
@@ -394,19 +429,17 @@ namespace BIT.Player
                     {
                         if (spriteRenderer == null) break;
                         spriteRenderer.sprite = frame;
-                        // Tint briefly orange-red to signal attack
                         spriteRenderer.color = new Color(1f, 0.6f, 0.2f);
                         yield return new WaitForSeconds(0.1f);
-                        if (spriteRenderer != null) spriteRenderer.color = Color.white;
+                        if (spriteRenderer != null) spriteRenderer.color = _baseColor;
                     }
                 }
             }
             else
             {
-                // Fallback: color flash when no attack sprites
                 if (spriteRenderer != null) spriteRenderer.color = new Color(1f, 0.5f, 0.1f);
                 yield return new WaitForSeconds(0.15f);
-                if (spriteRenderer != null) spriteRenderer.color = Color.white;
+                if (spriteRenderer != null) spriteRenderer.color = _baseColor;
             }
 
             _isAttackingAnim = false;
@@ -444,7 +477,7 @@ namespace BIT.Player
             // Efecto visual de espada con Katana.png
             if (BIT.Core.VFXManager.Instance != null)
             {
-                BIT.Core.VFXManager.Instance.SpawnMeleeSwordSwing(transform.position, lastMoveDirection);
+                BIT.Core.VFXManager.Instance.SpawnMeleeSwordSwing(transform, lastMoveDirection);
             }
 
             // ATAQUE MELEE - Buscar enemigos cercanos y hacerles daño
@@ -583,7 +616,7 @@ namespace BIT.Player
             _isAttackingAnim = false; // cancel attack tint if hit
             spriteRenderer.color = Color.red;
             yield return new WaitForSeconds(0.1f);
-            if (spriteRenderer != null) spriteRenderer.color = Color.white;
+            if (spriteRenderer != null) spriteRenderer.color = _baseColor;
         }
 
         void Die()
@@ -910,6 +943,7 @@ namespace BIT.Player
 
             if (spriteRenderer != null)
             {
+                _baseColor = data.spriteColor;
                 spriteRenderer.color = data.spriteColor;
 #if UNITY_EDITOR
                 if (!string.IsNullOrEmpty(data.spritePath))
