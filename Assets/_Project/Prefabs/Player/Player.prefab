@@ -415,6 +415,7 @@ MonoBehaviour:
   maxHealth: 100
   currentHealth: 100
   score: 0
+  coins: 0
   shurikenDamage: 20
   shurikenSpeed: 14
   shurikenCooldown: 0.45

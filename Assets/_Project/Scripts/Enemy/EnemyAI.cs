@@ -106,6 +106,10 @@ namespace BIT.Enemy
         // Estadísticas actuales
         private int _currentHealth;
 
+        // Anti-atasco
+        private Vector2 _lastPos;
+        private float _stuckTimer;
+
         // Patrulla
         private int _currentPatrolIndex = 0;
         private float _waitTimer = 0f;
@@ -352,21 +356,26 @@ namespace BIT.Enemy
 
         /// <summary>
         /// Intenta detectar al jugador dentro del radio de detección.
-        /// Usa OverlapCircle para buscar colliders en el área.
         /// </summary>
         private bool TryDetectPlayer()
         {
-            // Buscamos colliders del jugador en el radio de detección
-            Collider2D playerCollider = Physics2D.OverlapCircle(
-                transform.position,
-                _detectionRadius,
-                _playerLayer
-            );
-
-            if (playerCollider != null)
+            // Primero por LayerMask si está configurado
+            if (_playerLayer.value != 0)
             {
-                _targetPlayer = playerCollider.transform;
-                Debug.Log($"[EnemyAI] Jugador detectado a distancia: {Vector2.Distance(transform.position, _targetPlayer.position)}");
+                Collider2D col = Physics2D.OverlapCircle(transform.position, _detectionRadius, _playerLayer);
+                if (col != null)
+                {
+                    _targetPlayer = col.transform;
+                    return true;
+                }
+            }
+
+            // Fallback: buscar por tag (funciona aunque _playerLayer no esté asignado)
+            GameObject playerGO = GameObject.FindGameObjectWithTag("Player");
+            if (playerGO != null &&
+                Vector2.Distance(transform.position, playerGO.transform.position) <= _detectionRadius)
+            {
+                _targetPlayer = playerGO.transform;
                 return true;
             }
 
@@ -378,18 +387,29 @@ namespace BIT.Enemy
         // ====================================================================
 
         /// <summary>
-        /// Mueve al enemigo hacia una posición objetivo.
+        /// Mueve al enemigo hacia una posición objetivo con detección de atasco.
         /// </summary>
         private void MoveTowards(Vector3 targetPosition, float speed)
         {
-            // Calculamos dirección
             Vector2 direction = (targetPosition - transform.position).normalized;
-
-            // Aplicamos velocidad
             _rb.linearVelocity = direction * speed;
-
-            // Volteamos el sprite según la dirección
             FlipSprite(direction.x);
+
+            // Desatascarse si lleva 0.4s sin moverse
+            if (((Vector2)transform.position - _lastPos).sqrMagnitude < 0.0004f)
+            {
+                _stuckTimer += Time.deltaTime;
+                if (_stuckTimer > 0.4f)
+                {
+                    _rb.linearVelocity = Random.insideUnitCircle.normalized * speed * 1.5f;
+                    _stuckTimer = 0f;
+                }
+            }
+            else
+            {
+                _stuckTimer = 0f;
+            }
+            _lastPos = transform.position;
         }
 
         /// <summary>

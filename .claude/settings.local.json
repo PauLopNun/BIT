@@ -14,7 +14,18 @@
       "Bash(gh --version)",
       "Bash(git init:*)",
       "Bash(git config:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\UnityProjects\\\\BIT\\\\Assets\\\\_Project\\\\Scripts\" -Recurse -File -Filter \"*.cs\")",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Sort-Object)",
+      "Bash(Get-ChildItem -Path \"C:\\\\UnityProjects\\\\BIT\\\\Assets\\\\_Project\\\\Scripts\" -Recurse -Filter \"*Enemy*.cs\")",
+      "Bash(Get-ChildItem \"C:\\\\UnityProjects\\\\BIT\\\\Assets\\\\_Project\\\\Scenes\")",
+      "Bash(Select-Object Name, Length)",
+      "PowerShell(Get-ChildItem \"C:\\\\UnityProjects\\\\BIT\\\\Assets\\\\_Project\\\\Scenes\" | ForEach-Object { \"$\\($_.Name\\) - $\\($_.Length\\) bytes\" })",
+      "Bash(Get-ChildItem -Path \"C:\\\\UnityProjects\\\\BIT\\\\Assets\\\\kenney_tiny-dungeon\" -Recurse -Force)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Format-Table -AutoSize -Property FullName, PSIsContainer, Length)",
+      "PowerShell(head *)"
     ]
   }
 }

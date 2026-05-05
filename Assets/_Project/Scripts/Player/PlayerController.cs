@@ -68,9 +68,12 @@ namespace BIT.Player
         [Tooltip("Puntuación")]
         public int score = 0;
 
+        [Tooltip("Monedas acumuladas (se gastan en la tienda entre oleadas)")]
+        public int coins = 0;
+
         [Header("=== SHURIKEN (Clic Derecho) ===")]
         [Tooltip("Daño del shuriken manual (sin carga)")]
-        public int shurikenDamage = 20;
+        public int shurikenDamage = 28;
         [Tooltip("Velocidad del shuriken lanzado")]
         public float shurikenSpeed = 14f;
         [Tooltip("Cooldown entre shurikens manuales (segundos)")]
@@ -133,13 +136,14 @@ namespace BIT.Player
             playerInput = GetComponent<PlayerInput>();
 
             // Configuramos el Rigidbody para juego top-down
-            rb.gravityScale = 0f;           // Sin gravedad (es top-down)
-            rb.freezeRotation = true;        // No rotar al chocar
+            rb.gravityScale = 0f;
+            rb.freezeRotation = true;
             rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
-            // Auto-add AutoShooter (Vampire Survivors style weapon)
-            if (GetComponent<AutoShooter>() == null)
-                gameObject.AddComponent<AutoShooter>();
+            // Aumentar el radio del collider para que el sprite no se meta visualmente en las paredes.
+            // El sprite del ninja mide ~1 unidad; un radio de 0.42 lo cubre sin ser demasiado grande.
+            var circ = GetComponent<CircleCollider2D>();
+            if (circ != null) circ.radius = Mathf.Max(circ.radius, 0.42f);
 
             // Obtenemos las acciones del Input System
             if (playerInput != null && playerInput.actions != null)
@@ -593,40 +597,7 @@ namespace BIT.Player
             // SceneManager.LoadScene("GameOver");
         }
 
-        // ====================================================================
-        // COLISIONES (Para recoger objetos)
-        // ====================================================================
-
-        void OnTriggerEnter2D(Collider2D other)
-        {
-            // Ejemplo: recoger moneda
-            if (other.CompareTag("Coin"))
-            {
-                AddScore(100);
-
-                // Efecto de particulas doradas
-                if (BIT.Core.VFXManager.Instance != null)
-                {
-                    BIT.Core.VFXManager.Instance.SpawnPickupEffect(other.transform.position, new Color(1f, 0.9f, 0.2f));
-                }
-
-                Destroy(other.gameObject);
-            }
-
-            // Ejemplo: recoger corazón
-            if (other.CompareTag("Health"))
-            {
-                Heal(25);
-
-                // Efecto de particulas rosadas
-                if (BIT.Core.VFXManager.Instance != null)
-                {
-                    BIT.Core.VFXManager.Instance.SpawnPickupEffect(other.transform.position, new Color(1f, 0.4f, 0.6f));
-                }
-
-                Destroy(other.gameObject);
-            }
-        }
+        // Las monedas y corazones los gestiona PickupBase — no hay sistema duplicado aquí.
 
         // ====================================================================
         // MODIFICADORES DE VELOCIDAD (Para power-ups y debuffs)
@@ -686,10 +657,10 @@ namespace BIT.Player
         }
 
         // ====================================================================
-        // KUNAI MANUAL — Clic derecho
+        // SHURIKEN MANUAL — Clic derecho
         // ====================================================================
 
-        private static Sprite _cachedKunaiSprite;
+        private static Sprite _cachedShurikenSprite;
 
         void ThrowShuriken(float chargeT = 0f)
         {
@@ -700,7 +671,7 @@ namespace BIT.Player
             // Multiplicadores según nivel de carga (0 = sin carga, 1 = carga máxima)
             int   finalDamage = Mathf.RoundToInt(shurikenDamage * (1f + chargeT));      // ×1 – ×2
             float finalSpeed  = shurikenSpeed  * (1f + chargeT * 0.5f);                 // ×1 – ×1.5
-            float finalScale  = 0.5f           * (1f + chargeT * 0.7f);                 // 0.5 – 0.85
+            float finalScale  = 1.0f           * (1f + chargeT * 0.3f);                 // 1.0 – 1.3
 
             Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
             Vector3 mouseWorldPos  = Camera.main.ScreenToWorldPoint(
@@ -708,59 +679,75 @@ namespace BIT.Player
             mouseWorldPos.z = 0f;
             Vector2 dir = ((Vector2)mouseWorldPos - (Vector2)transform.position).normalized;
 
-            var bulletGO = new GameObject("Kunai");
+            var bulletGO = new GameObject("Shuriken");
             bulletGO.transform.position = transform.position + (Vector3)dir * 0.5f;
             bulletGO.tag = "Projectile";
 
-            // Rotar la punta del kunai hacia el cursor (sprite apunta hacia arriba → -90°)
             float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-            bulletGO.transform.rotation = Quaternion.Euler(0f, 0f, angle - 90f);
+            bulletGO.transform.rotation = Quaternion.Euler(0f, 0f, angle);
 
             var sr = bulletGO.AddComponent<SpriteRenderer>();
-            // Color: blanco sin carga → dorado en carga máxima
             sr.color = Color.Lerp(new Color(0.85f, 0.9f, 1f), new Color(1f, 0.8f, 0.1f), chargeT);
-            sr.sortingOrder = 5;
+            sr.sortingOrder = 20;
             bulletGO.transform.localScale = Vector3.one * finalScale;
 
-            // Cargar sprite del Kunai (se cachea tras la primera carga)
-            if (_cachedKunaiSprite == null)
+            if (_cachedShurikenSprite == null)
             {
 #if UNITY_EDITOR
-                const string SHEET  = "Assets/_Project/Sprites/Ninja Adventure/Items/Projectile/Kunai/SpriteSheet.png";
-                const string SINGLE = "Assets/_Project/Sprites/Ninja Adventure/Items/Projectile/Kunai.png";
-                _cachedKunaiSprite =
-                    UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SHEET).OfType<Sprite>().FirstOrDefault()
-                    ?? UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SINGLE).OfType<Sprite>().FirstOrDefault();
+                // Prioridad: sprite individual limpio (no SpriteSheet) → frame 0 del SpriteSheet → BigShuriken
+                string[] singles = {
+                    "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken.png",
+                    "Assets/_Project/Sprites/Ninja Adventure/Items/Projectile/Shuriken.png",
+                    "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/BigShuriken.png",
+                };
+                foreach (var p in singles)
+                {
+                    _cachedShurikenSprite = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(p)
+                        .OfType<Sprite>().FirstOrDefault();
+                    if (_cachedShurikenSprite != null) break;
+                }
+                // Fallback: frame 0 del SpriteSheet (ordenado por índice para evitar frames transparentes)
+                if (_cachedShurikenSprite == null)
+                {
+                    const string SHEET = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken/SpriteSheet.png";
+                    _cachedShurikenSprite = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SHEET)
+                        .OfType<Sprite>()
+                        .OrderBy(s => { int i = s.name.LastIndexOf('_'); return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999; })
+                        .FirstOrDefault();
+                }
+                Debug.Log($"[Player] Shuriken sprite: {(_cachedShurikenSprite != null ? _cachedShurikenSprite.name : "NULL — fallback estrella")}");
 #endif
             }
 
-            if (_cachedKunaiSprite != null)
+            if (_cachedShurikenSprite != null)
             {
-                sr.sprite = _cachedKunaiSprite;
+                sr.sprite = _cachedShurikenSprite;
             }
             else
             {
-                // Fallback: rombo/daga simple
-                var tex = new Texture2D(16, 32, TextureFormat.RGBA32, false);
-                var pixels = new Color[512];
-                for (int i = 0; i < 512; i++)
+                // Fallback: estrella de 4 puntas
+                var tex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+                var pixels = new Color[1024];
+                var ctr = new UnityEngine.Vector2(15.5f, 15.5f);
+                for (int i = 0; i < 1024; i++)
                 {
-                    int x = i % 16, y = i / 16;
-                    float cx = 7.5f, cy = 15.5f;
-                    float dx = Mathf.Abs(x - cx), dy = y - 4f;
-                    bool inBlade = dy >= 0 && dy <= 24 && dx <= (24 - dy) * 0.3f;
-                    bool inHandle = y >= 0 && y < 6 && dx <= 2.5f;
-                    pixels[i] = (inBlade || inHandle) ? Color.white : Color.clear;
+                    int x = i % 32, y = i / 32;
+                    float dx = x - ctr.x, dy = y - ctr.y;
+                    float dist  = Mathf.Sqrt(dx * dx + dy * dy);
+                    float ang   = Mathf.Atan2(Mathf.Abs(dy), Mathf.Abs(dx));
+                    float rstar = 13f * (1f - 0.5f * Mathf.Sin(ang * 2f));
+                    pixels[i] = dist <= rstar ? Color.white : Color.clear;
                 }
                 tex.SetPixels(pixels);
                 tex.Apply();
-                sr.sprite = Sprite.Create(tex, new Rect(0, 0, 16, 32), new UnityEngine.Vector2(0.5f, 0.5f), 32f);
+                sr.sprite = Sprite.Create(tex, new Rect(0, 0, 32, 32), UnityEngine.Vector2.one * 0.5f, 32f);
             }
 
             var rb = bulletGO.AddComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
-            rb.freezeRotation = true;   // El kunai vuela recto sin girar
+            rb.freezeRotation = false;
             rb.linearVelocity  = dir * finalSpeed;
+            rb.angularVelocity = 480f + chargeT * 240f;
 
             var col = bulletGO.AddComponent<CircleCollider2D>();
             col.isTrigger = true;

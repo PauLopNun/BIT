@@ -18,31 +18,74 @@ namespace BIT.Enemy
 
         [Header("=== DROPS ===")]
         [SerializeField] private List<DropEntry> _drops = new List<DropEntry>();
-        [Tooltip("Radio de dispersión aleatorio al dropear")]
-        [SerializeField] private float _spawnRadius = 0.5f;
-
         public void Drop()
         {
-            foreach (var entry in _drops)
+            Vector3 pos = GetDropPosition();
+
+            // Barajar para no dar siempre prioridad al mismo tipo de drop
+            var order = new List<DropEntry>(_drops);
+            for (int i = order.Count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                var tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+            }
+
+            // Solo cae un item por muerte
+            foreach (var entry in order)
             {
                 if (entry.prefab == null) continue;
                 if (Random.value <= entry.probability)
                 {
-                    Vector2 offset = Random.insideUnitCircle * _spawnRadius;
-                    Instantiate(entry.prefab, transform.position + (Vector3)offset, Quaternion.identity);
+                    EnsurePickupBehavior(Instantiate(entry.prefab, pos, Quaternion.identity));
+                    break;
                 }
             }
         }
 
-        // Guaranteed drop (used by boss for double drop)
         public void ForceDrop()
         {
+            Vector3 pos = GetDropPosition();
             foreach (var entry in _drops)
             {
                 if (entry.prefab == null) continue;
-                Vector2 offset = Random.insideUnitCircle * _spawnRadius;
-                Instantiate(entry.prefab, transform.position + (Vector3)offset, Quaternion.identity);
+                EnsurePickupBehavior(Instantiate(entry.prefab, pos, Quaternion.identity));
             }
+        }
+
+        // Prefabs de Heart y Coin no tienen script adjunto: lo añadimos aquí.
+        static void EnsurePickupBehavior(GameObject go)
+        {
+            if (go.GetComponent<BIT.Interactables.PickupBase>() != null) return;
+            string n = go.name.ToLower();
+            if (n.Contains("heart"))      go.AddComponent<BIT.Interactables.HealthPickup>();
+            else if (n.Contains("coin"))  go.AddComponent<BIT.Interactables.ScorePickup>();
+        }
+
+        // Spawnea cerca del jugador en suelo libre (sin paredes).
+        static Vector3 GetDropPosition()
+        {
+            var player = FindFirstObjectByType<BIT.Player.PlayerController>();
+            if (player == null) return Vector3.zero;
+
+            Vector2 playerPos = player.transform.position;
+
+            for (int attempt = 0; attempt < 30; attempt++)
+            {
+                float angle = Random.Range(0f, Mathf.PI * 2f);
+                // Distancia pequeña: cuanto más cerca del jugador, menos probable acabar en pared
+                float dist  = Random.Range(0.3f, 0.9f);
+                Vector2 candidate = playerPos + new Vector2(Mathf.Cos(angle) * dist, Mathf.Sin(angle) * dist);
+
+                // Radio generoso (0.4) para detectar bordes de pared con margen
+                bool blocked = false;
+                foreach (var h in Physics2D.OverlapCircleAll(candidate, 0.4f))
+                    if (!h.isTrigger) { blocked = true; break; }
+
+                if (!blocked) return candidate;
+            }
+
+            // El jugador siempre está en suelo válido
+            return playerPos;
         }
 
         // Configure drops at runtime (used by WaveManager for spawned enemies)

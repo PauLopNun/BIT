@@ -56,7 +56,7 @@ namespace BIT.Core
         [SerializeField] private GameObject _bossPrefab;
 
         [Tooltip("Cada cuántas rondas aparece el boss")]
-        [SerializeField] private int _bossEveryNWaves = 10;
+        [SerializeField] private int _bossEveryNWaves = 3;
 
         [Header("=== DIFICULTAD ===")]
         [Tooltip("Enemigos en la primera oleada")]
@@ -77,12 +77,6 @@ namespace BIT.Core
         [Header("=== SPAWNING ===")]
         [Tooltip("Puntos de spawn (si están vacíos, se usan posiciones aleatorias)")]
         [SerializeField] private Transform[] _spawnPoints;
-
-        [Tooltip("Área de spawn aleatorio: mitad del ancho (si no hay spawn points)")]
-        [SerializeField] private float _spawnAreaHalfWidth = 7f;
-
-        [Tooltip("Área de spawn aleatorio: mitad del alto")]
-        [SerializeField] private float _spawnAreaHalfHeight = 4f;
 
         [Tooltip("Distancia mínima al jugador para spawnear")]
         [SerializeField] private float _minSpawnDistanceFromPlayer = 3f;
@@ -145,6 +139,18 @@ namespace BIT.Core
             GameObject player = GameObject.FindGameObjectWithTag("Player");
             if (player != null)
                 _playerTransform = player.transform;
+
+            // Si los spawn points no están asignados en el inspector, buscarlos en la escena
+            if (_spawnPoints == null || _spawnPoints.Length == 0)
+            {
+                var container = GameObject.Find("SpawnPoints");
+                if (container != null)
+                {
+                    _spawnPoints = new Transform[container.transform.childCount];
+                    for (int i = 0; i < container.transform.childCount; i++)
+                        _spawnPoints[i] = container.transform.GetChild(i);
+                }
+            }
 
             // Si no hay GameManager, inicializamos el PlayerStatsSO directamente
             if (GameManager.Instance == null && _playerStats != null)
@@ -250,15 +256,17 @@ namespace BIT.Core
             var bossAI = boss.GetComponent<BossEnemyAI>();
             if (bossAI != null)
             {
-                float bossScale = 1f + (_currentWave / _bossEveryNWaves - 1) * 0.5f;
+                float bossScale = 1f + (_currentWave / _bossEveryNWaves - 1) * 0.3f;
                 bossAI.ScaleStats(Mathf.Max(1f, bossScale));
             }
             else
             {
-                // Sin BossEnemyAI: escalar el enemigo normal x8 para que actúe de boss
-                ScaleEnemyStats(boss, 8f);
-                boss.transform.localScale = Vector3.one * 1.8f;
+                ScaleEnemyStats(boss, 3f);
+                boss.transform.localScale = Vector3.one * 1.4f;
             }
+
+            // Intentar aplicar sprite único de boss (TRex/Skull, no aparecen en oleadas normales)
+            ApplyBossVisual(boss);
 
             _activeEnemies.Add(boss);
             OnEnemyCountChanged?.Invoke(CountAliveEnemies());
@@ -389,6 +397,7 @@ namespace BIT.Core
             }
 
             ScaleEnemyStats(enemy);
+            MakeEnemyIgnoreWalls(enemy);
 
             // Ensure prefab-based enemies have item drops configured
             var dropper = enemy.GetComponent<BIT.Enemy.EnemyDropper>();
@@ -397,8 +406,8 @@ namespace BIT.Core
                 dropper = enemy.AddComponent<BIT.Enemy.EnemyDropper>();
                 var heartPrefab = LoadPickupPrefab("Heart");
                 var coinPrefab  = LoadPickupPrefab("Coin");
-                if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.12f);
-                if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.45f);
+                if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.40f);
+                if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.70f);
             }
 
             return enemy;
@@ -456,8 +465,8 @@ namespace BIT.Core
                 dropper = go.AddComponent<BIT.Enemy.EnemyDropper>();
                 var heartPrefab = LoadPickupPrefab("Heart");
                 var coinPrefab  = LoadPickupPrefab("Coin");
-                if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.18f);
-                if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.50f);
+                if (heartPrefab != null) dropper.AddDrop(heartPrefab, 0.40f);
+                if (coinPrefab  != null) dropper.AddDrop(coinPrefab,  0.70f);
             }
 
             return go;
@@ -512,32 +521,63 @@ namespace BIT.Core
             if (bossAI != null) bossAI.ScaleStats(scaleFactor);
         }
 
-        /// <summary>Obtiene una posición de spawn válida (alejada del jugador).</summary>
+        // Límites del mapa cacheados para no recalcularlos cada spawn
+        private Bounds _mapBounds;
+        private bool _mapBoundsCached;
+
+        /// <summary>Obtiene una posición de spawn válida alrededor del jugador y dentro del mapa.</summary>
         private Vector3 GetSpawnPosition()
         {
-            // Si hay puntos de spawn definidos, los usamos
+            if (_playerTransform == null) return Vector3.zero;
+
+            // Primero: usar spawn points pre-calculados por el generador de mapa (son seguros)
             if (_spawnPoints != null && _spawnPoints.Length > 0)
+                return _spawnPoints[Random.Range(0, _spawnPoints.Length)].position;
+
+            // Cachear los límites del mapa a partir del Tilemap
+            if (!_mapBoundsCached) CacheMapBounds();
+
+            for (int i = 0; i < 40; i++)
             {
-                Transform point = _spawnPoints[Random.Range(0, _spawnPoints.Length)];
-                return point.position;
+                float angle    = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+                float distance = Random.Range(_minSpawnDistanceFromPlayer, _minSpawnDistanceFromPlayer + 5f);
+                Vector2 candidate = (Vector2)_playerTransform.position
+                                  + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distance;
+
+                // Acotar al área interior del mapa (margen de 2 unidades respecto al borde)
+                if (_mapBounds.size != Vector3.zero)
+                {
+                    candidate.x = Mathf.Clamp(candidate.x, _mapBounds.min.x + 2f, _mapBounds.max.x - 2f);
+                    candidate.y = Mathf.Clamp(candidate.y, _mapBounds.min.y + 2f, _mapBounds.max.y - 2f);
+                }
+
+                bool blocked = false;
+                foreach (var h in Physics2D.OverlapCircleAll(candidate, 0.35f))
+                    if (!h.isTrigger) { blocked = true; break; }
+
+                if (!blocked) return candidate;
             }
 
-            // Si no, posición aleatoria dentro del área
-            Vector3 pos;
-            int maxAttempts = 20;
+            // Fallback: junto al jugador
+            return _playerTransform.position + new Vector3(_minSpawnDistanceFromPlayer + 1f, 0f, 0f);
+        }
 
-            do
+        private void CacheMapBounds()
+        {
+            _mapBoundsCached = true;
+            var grid = GameObject.Find("Grid");
+            if (grid == null) return;
+
+            var tilemaps = grid.GetComponentsInChildren<UnityEngine.Tilemaps.Tilemap>();
+            if (tilemaps.Length == 0) return;
+
+            _mapBounds = new Bounds(tilemaps[0].transform.TransformPoint(tilemaps[0].localBounds.center), Vector3.zero);
+            foreach (var tm in tilemaps)
             {
-                float x = Random.Range(-_spawnAreaHalfWidth, _spawnAreaHalfWidth);
-                float y = Random.Range(-_spawnAreaHalfHeight, _spawnAreaHalfHeight);
-                pos = new Vector3(x, y, 0f);
-                maxAttempts--;
+                var lb = tm.localBounds;
+                _mapBounds.Encapsulate(tm.transform.TransformPoint(lb.min));
+                _mapBounds.Encapsulate(tm.transform.TransformPoint(lb.max));
             }
-            while (_playerTransform != null
-                   && Vector2.Distance(pos, _playerTransform.position) < _minSpawnDistanceFromPlayer
-                   && maxAttempts > 0);
-
-            return pos;
         }
 
         // ====================================================================
@@ -570,12 +610,60 @@ namespace BIT.Core
         /// Registra un minion invocado por el boss en la lista de enemigos activos.
         /// Así la oleada no termina hasta que también muera el minion.
         /// </summary>
+        /// <summary>Devuelve un spawn point aleatorio seguro (usado por EnemyDropper para drops).</summary>
+        public Vector3 GetRandomSpawnPoint()
+        {
+            if (_spawnPoints != null && _spawnPoints.Length > 0)
+                return _spawnPoints[Random.Range(0, _spawnPoints.Length)].position;
+            // Fallback a posición aleatoria dentro del área si no hay spawn points
+            return GetSpawnPosition();
+        }
+
         public void RegisterBossMinion(GameObject minion)
         {
             if (minion != null && !_activeEnemies.Contains(minion))
             {
                 _activeEnemies.Add(minion);
                 OnEnemyCountChanged?.Invoke(CountAliveEnemies());
+            }
+        }
+
+        /// <summary>
+        /// Hace que el enemigo ignore colisiones con los tiles de pared (CompositeCollider2D)
+        /// pero siga chocando con los bordes invisibles del mapa (BoxCollider2D).
+        /// </summary>
+        private static void MakeEnemyIgnoreWalls(GameObject enemy)
+        {
+            // El tilemap de paredes se llama "Walls" y tiene CompositeCollider2D
+            var wallsGO = GameObject.Find("Walls");
+            if (wallsGO == null) return;
+            var wallComposite = wallsGO.GetComponent<CompositeCollider2D>();
+            if (wallComposite == null) return;
+
+            foreach (var col in enemy.GetComponentsInChildren<Collider2D>(true))
+                Physics2D.IgnoreCollision(col, wallComposite, true);
+        }
+
+        /// <summary>Aplica sprite y tinte únicos al boss para que se diferencie de los enemigos normales.</summary>
+        private void ApplyBossVisual(GameObject boss)
+        {
+            var sr = boss.GetComponent<SpriteRenderer>();
+            if (sr == null) return;
+
+            // Intentar cargar TRex o Skull — enemigos que NO aparecen en oleadas normales
+            Sprite bossSprite = LoadFirstAvailableSprite(
+                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/TRex/SpriteSheet.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Actor/Monster/Skull/SpriteSheet.png"
+            );
+
+            if (bossSprite != null)
+            {
+                sr.sprite = bossSprite;
+                sr.color = Color.white; // sprite propio, sin tinte
+            }
+            else
+            {
+                sr.color = new Color(1f, 0.35f, 0.1f); // naranja-rojo si no carga sprite
             }
         }
 

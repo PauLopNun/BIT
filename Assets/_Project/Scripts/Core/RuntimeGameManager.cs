@@ -43,6 +43,7 @@ namespace BIT.Core
         private int _currentHealth = 100;
         private int _maxHealth = 100;
         private int _score = 0;
+        private int _coins = 0;
         private bool _isGameOver = false;
         private bool _isVictory = false;
         private int _enemiesKilled = 0;
@@ -52,7 +53,10 @@ namespace BIT.Core
         private Text _waveMessageText;
         private GameObject _waveMessageGO;
         private Text _waveNumText;
+        private Text _coinText;
         private Coroutine _waveMessageCoroutine;
+
+        private Vector3 _scoreTextOriginalScale = Vector3.one;
 
         // Audio clips cargados
         private AudioClip _backgroundMusic;
@@ -82,6 +86,11 @@ namespace BIT.Core
                 return;
             }
             Instance = this;
+
+            // Awake se ejecuta antes que cualquier física/trigger.
+            // Limpiamos pickups Y enemigos pre-colocados en la escena por el setup script.
+            // Solo el WaveManager debe crear enemigos; los pickups solo existen como drops.
+            CleanPreplacedObjects();
         }
 
         void Start()
@@ -93,6 +102,31 @@ namespace BIT.Core
             StartCoroutine(SubscribeToWaveManager());
 
             Debug.Log("[RuntimeGameManager] Sistema inicializado");
+        }
+
+        static void CleanPreplacedObjects()
+        {
+            int pickups = 0, enemies = 0;
+
+            // Por componente (tiene PickupBase)
+            foreach (var p in FindObjectsByType<BIT.Interactables.PickupBase>(FindObjectsSortMode.None))
+            { DestroyImmediate(p.gameObject); pickups++; }
+
+            // Por tag (GameObjects con tag Coin/Health pero sin PickupBase —
+            // objetos sueltos que quedan de runs anteriores del setup)
+            foreach (var go in GameObject.FindGameObjectsWithTag("Coin"))
+            { DestroyImmediate(go); pickups++; }
+            foreach (var go in GameObject.FindGameObjectsWithTag("Health"))
+            { DestroyImmediate(go); pickups++; }
+            foreach (var go in GameObject.FindGameObjectsWithTag("Pickup"))
+            { DestroyImmediate(go); pickups++; }
+
+            // Enemigos pre-colocados
+            foreach (var go in GameObject.FindGameObjectsWithTag("Enemy"))
+            { DestroyImmediate(go); enemies++; }
+
+            if (pickups > 0 || enemies > 0)
+                Debug.Log($"[RuntimeGameManager] Limpieza: {pickups} pickups y {enemies} enemigos pre-colocados eliminados.");
         }
 
         void OnDestroy()
@@ -187,21 +221,22 @@ namespace BIT.Core
             topRect.anchorMax = new Vector2(1, 1);
             topRect.pivot = new Vector2(0.5f, 1);
             topRect.anchoredPosition = Vector2.zero;
-            topRect.sizeDelta = new Vector2(0, 80);
+            topRect.sizeDelta = new Vector2(0, 96);
 
             // Corazones (vida)
             CreateHearts(topPanel.transform);
 
-            // Texto de puntuacion
-            _scoreText = CreateText("ScoreText", topPanel.transform, "Score: 0");
+            // Puntuación — abajo a la derecha (sustituye al texto de Nivel)
+            _scoreText = CreateText("ScoreText", _canvas.transform, "Score: 0");
             RectTransform scoreRect = _scoreText.GetComponent<RectTransform>();
-            scoreRect.anchorMin = new Vector2(1, 0.5f);
-            scoreRect.anchorMax = new Vector2(1, 0.5f);
-            scoreRect.pivot = new Vector2(1, 0.5f);
-            scoreRect.anchoredPosition = new Vector2(-20, 0);
-            scoreRect.sizeDelta = new Vector2(200, 40);
+            scoreRect.anchorMin = new Vector2(1f, 0f);
+            scoreRect.anchorMax = new Vector2(1f, 0f);
+            scoreRect.pivot     = new Vector2(1f, 0f);
+            scoreRect.anchoredPosition = new Vector2(-15f, 15f);
+            scoreRect.sizeDelta = new Vector2(220f, 36f);
             _scoreText.alignment = TextAnchor.MiddleRight;
-            _scoreText.fontSize = 28;
+            _scoreText.fontSize  = 28;
+            _scoreTextOriginalScale = _scoreText.transform.localScale;
 
             // Texto de vida (numerico)
             _healthText = CreateText("HealthText", topPanel.transform, "100/100");
@@ -210,8 +245,8 @@ namespace BIT.Core
             healthRect.anchorMax = new Vector2(0, 0.5f);
             healthRect.pivot = new Vector2(0, 0.5f);
             healthRect.anchoredPosition = new Vector2(20 + (maxHearts * 45), 0);
-            healthRect.sizeDelta = new Vector2(120, 30);
-            _healthText.fontSize = 20;
+            healthRect.sizeDelta = new Vector2(120, 34);
+            _healthText.fontSize = 24;
 
             // Contador de enemigos
             _enemyCountText = CreateText("EnemyCount", topPanel.transform, "Enemies: 0/0");
@@ -220,9 +255,9 @@ namespace BIT.Core
             enemyRect.anchorMax = new Vector2(0.5f, 0.5f);
             enemyRect.pivot = new Vector2(0.5f, 0.5f);
             enemyRect.anchoredPosition = new Vector2(0, 0);
-            enemyRect.sizeDelta = new Vector2(200, 40);
+            enemyRect.sizeDelta = new Vector2(220, 44);
             _enemyCountText.alignment = TextAnchor.MiddleCenter;
-            _enemyCountText.fontSize = 22;
+            _enemyCountText.fontSize = 26;
 
             // Panel de Game Over (oculto inicialmente)
             CreateGameOverPanel();
@@ -237,8 +272,8 @@ namespace BIT.Core
             waveNumRect.anchorMax = new Vector2(0, 0.5f);
             waveNumRect.pivot = new Vector2(0, 0.5f);
             waveNumRect.anchoredPosition = new Vector2(20 + (maxHearts * 45) + 130, 0);
-            waveNumRect.sizeDelta = new Vector2(160, 30);
-            _waveNumText.fontSize = 20;
+            waveNumRect.sizeDelta = new Vector2(160, 34);
+            _waveNumText.fontSize = 24;
             _waveNumText.color = new Color(0.9f, 0.9f, 0.4f);
 
             // Mensaje de oleada (centro de pantalla)
@@ -261,43 +296,70 @@ namespace BIT.Core
             waveMsgRT.sizeDelta = new Vector2(0, 80);
             _waveMessageGO.SetActive(false);
 
-            // Indicador del ninja elegido (debajo del top panel, izquierda)
+            // Monedas — arriba a la derecha del todo
+            _coinText = CreateText("CoinText", _canvas.transform, "$ 0");
+            RectTransform coinRect = _coinText.GetComponent<RectTransform>();
+            coinRect.anchorMin = new Vector2(1f, 1f);
+            coinRect.anchorMax = new Vector2(1f, 1f);
+            coinRect.pivot     = new Vector2(1f, 1f);
+            coinRect.anchoredPosition = new Vector2(-10f, -8f);
+            coinRect.sizeDelta = new Vector2(130f, 36f);
+            _coinText.alignment = TextAnchor.UpperRight;
+            _coinText.fontSize  = 28;
+            _coinText.color     = new Color(1f, 0.85f, 0.1f);
+
+            // Indicador del ninja elegido — dentro del top panel, izquierda tras los corazones
             var csm = CharacterSelectManager.Instance;
             if (csm?.SelectedCharacter != null)
             {
                 var cd = csm.SelectedCharacter;
                 var ninjaGO = new GameObject("NinjaIndicator");
-                ninjaGO.transform.SetParent(_canvas.transform, false);
+                ninjaGO.transform.SetParent(topPanel.transform, false);
                 var ninjaText = ninjaGO.AddComponent<Text>();
                 ninjaText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 ninjaText.text = $"[ {cd.characterName} ]";
-                ninjaText.fontSize = 16;
+                ninjaText.fontSize = 20;
                 ninjaText.fontStyle = FontStyle.Bold;
                 ninjaText.color = cd.spriteColor;
-                ninjaText.alignment = TextAnchor.UpperLeft;
+                ninjaText.alignment = TextAnchor.MiddleLeft;
+                var ninjaOutline = ninjaGO.AddComponent<Outline>();
+                ninjaOutline.effectColor = Color.black;
+                ninjaOutline.effectDistance = new Vector2(2, -2);
                 var ninjaRT = ninjaGO.GetComponent<RectTransform>();
-                ninjaRT.anchorMin = new Vector2(0f, 1f);
-                ninjaRT.anchorMax = new Vector2(0f, 1f);
-                ninjaRT.pivot = new Vector2(0f, 1f);
-                ninjaRT.anchoredPosition = new Vector2(12f, -82f);
-                ninjaRT.sizeDelta = new Vector2(200f, 22f);
+                ninjaRT.anchorMin = new Vector2(0f, 0f);
+                ninjaRT.anchorMax = new Vector2(0f, 0f);
+                ninjaRT.pivot     = new Vector2(0f, 0f);
+                // Pegado debajo de los corazones, parte inferior del HUD
+                ninjaRT.anchoredPosition = new Vector2(15f, 4f);
+                ninjaRT.sizeDelta = new Vector2(maxHearts * 45f + 20f, 22f);
             }
 
-            // Panel de controles (esquina inferior izquierda)
+            // Panel de controles — esquina inferior izquierda con fondo oscuro para legibilidad
+            var ctrlBgGO = new GameObject("ControlsBg");
+            ctrlBgGO.transform.SetParent(_canvas.transform, false);
+            var ctrlBg = ctrlBgGO.AddComponent<Image>();
+            ctrlBg.color = new Color(0f, 0f, 0f, 0.60f);
+            var ctrlBgRT = ctrlBgGO.GetComponent<RectTransform>();
+            ctrlBgRT.anchorMin = new Vector2(0f, 0f);
+            ctrlBgRT.anchorMax = new Vector2(0f, 0f);
+            ctrlBgRT.pivot = new Vector2(0f, 0f);
+            ctrlBgRT.anchoredPosition = new Vector2(8f, 8f);
+            ctrlBgRT.sizeDelta = new Vector2(192f, 108f);
+
             var ctrlGO = new GameObject("ControlsHint");
             ctrlGO.transform.SetParent(_canvas.transform, false);
             var ctrlText = ctrlGO.AddComponent<Text>();
             ctrlText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            ctrlText.fontSize = 14;
-            ctrlText.color = new Color(0.85f, 0.85f, 0.85f, 0.75f);
+            ctrlText.fontSize = 16;
+            ctrlText.color = Color.white;
             ctrlText.alignment = TextAnchor.LowerLeft;
-            ctrlText.text = "WASD  Mover\nLMB  Melee\nRMB  Shuriken\nShift  Dash (x2 dmg)\nE  Interactuar";
+            ctrlText.text = "WASD  Mover\nLMB  Melee\nRMB  Shuriken\nShift  Dash\nE  Interactuar";
             var ctrlRT = ctrlGO.GetComponent<RectTransform>();
             ctrlRT.anchorMin = new Vector2(0f, 0f);
             ctrlRT.anchorMax = new Vector2(0f, 0f);
             ctrlRT.pivot = new Vector2(0f, 0f);
-            ctrlRT.anchoredPosition = new Vector2(10f, 10f);
-            ctrlRT.sizeDelta = new Vector2(200f, 90f);
+            ctrlRT.anchoredPosition = new Vector2(16f, 14f);
+            ctrlRT.sizeDelta = new Vector2(176f, 100f);
 
             Debug.Log("[RuntimeGameManager] UI creada");
         }
@@ -631,6 +693,20 @@ namespace BIT.Core
             StartCoroutine(ScorePop());
         }
 
+        public void AddCoins(int amount)
+        {
+            _coins += amount;
+            if (_coinText != null) _coinText.text = $"$ {_coins}";
+        }
+
+        public bool SpendCoins(int amount)
+        {
+            if (_coins < amount) return false;
+            _coins -= amount;
+            if (_coinText != null) _coinText.text = $"$ {_coins}";
+            return true;
+        }
+
         public void PlayAttackSound()
         {
             PlaySFX(_attackSound);
@@ -694,10 +770,9 @@ namespace BIT.Core
         {
             if (_scoreText == null) yield break;
 
-            Vector3 originalScale = _scoreText.transform.localScale;
-            _scoreText.transform.localScale = originalScale * 1.3f;
+            _scoreText.transform.localScale = _scoreTextOriginalScale * 1.2f;
             yield return new WaitForSeconds(0.1f);
-            _scoreText.transform.localScale = originalScale;
+            _scoreText.transform.localScale = _scoreTextOriginalScale;
         }
 
         // ====================================================================
@@ -723,7 +798,7 @@ namespace BIT.Core
         {
             yield return new WaitForSeconds(delay);
             Time.timeScale = 1f;
-            UnityEngine.SceneManagement.SceneManager.LoadScene("gamesetupscene");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("CharacterSelect");
         }
 
         void Victory()
@@ -761,7 +836,7 @@ namespace BIT.Core
         void RestartGame()
         {
             Time.timeScale = 1f;
-            UnityEngine.SceneManagement.SceneManager.LoadScene("gamesetupscene");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("CharacterSelect");
         }
 
         // ====================================================================
@@ -849,6 +924,7 @@ namespace BIT.Core
         public int CurrentHealth => _currentHealth;
         public int MaxHealth => _maxHealth;
         public int Score => _score;
+        public int Coins => _coins;
         public bool IsGameOver => _isGameOver;
     }
 }

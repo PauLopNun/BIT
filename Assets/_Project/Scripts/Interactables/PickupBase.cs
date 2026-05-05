@@ -78,7 +78,17 @@ namespace BIT.Interactables
         protected virtual void Awake()
         {
             _spriteRenderer = GetComponent<SpriteRenderer>();
-            _startPosition = transform.position;
+            _startPosition  = transform.position;
+
+            // Garantizar collider trigger siempre, aunque el prefab no lo tenga
+            Collider2D col = GetComponent<Collider2D>();
+            if (col == null)
+            {
+                var circle    = gameObject.AddComponent<CircleCollider2D>();
+                circle.radius = 0.4f;
+                col           = circle;
+            }
+            col.isTrigger = true;
         }
 
         // ====================================================================
@@ -99,45 +109,24 @@ namespace BIT.Interactables
         // SECCIÓN 5: DETECCIÓN DE COLISIÓN
         // ====================================================================
 
-        /// <summary>
-        /// Se llama cuando el jugador entra en contacto con el pickup.
-        /// El Collider del pickup debe estar marcado como "Is Trigger".
-        /// </summary>
-        protected virtual void OnTriggerEnter2D(Collider2D other)
+        protected virtual void OnTriggerEnter2D(Collider2D other) => TryCollect(other);
+        protected virtual void OnTriggerStay2D(Collider2D other)  => TryCollect(other);
+
+        void TryCollect(Collider2D other)
         {
-            // Evitamos recoger dos veces
             if (_hasBeenPickedUp) return;
 
-            // Verificamos que sea el jugador
-            if (other.CompareTag(_targetTag))
-            {
-                _hasBeenPickedUp = true;
+            // Buscar PlayerController directamente — no dependemos del tag
+            PlayerController player = other.GetComponent<PlayerController>();
+            if (player == null) return;
 
-                // Obtenemos referencia al PlayerController
-                PlayerController player = other.GetComponent<PlayerController>();
+            _hasBeenPickedUp = true;
+            ApplyEffect(player);
+            PlayFeedback();
+            _onPickupEvent?.Raise();
 
-                if (player != null)
-                {
-                    // Aplicamos el efecto específico (implementado en las clases hijas)
-                    ApplyEffect(player);
-
-                    // Feedback visual y sonoro
-                    PlayFeedback();
-
-                    // Disparamos evento (para UI, logros, etc.)
-                    _onPickupEvent?.Raise();
-                }
-
-                // Destruimos o desactivamos el objeto
-                if (_destroyOnPickup)
-                {
-                    Destroy(gameObject, 0.1f); // Pequeño delay para que se vean las partículas
-                }
-                else
-                {
-                    gameObject.SetActive(false);
-                }
-            }
+            if (_destroyOnPickup) Destroy(gameObject, 0.1f);
+            else gameObject.SetActive(false);
         }
 
         // ====================================================================
@@ -263,7 +252,8 @@ namespace BIT.Interactables
         protected override void ApplyEffect(PlayerController player)
         {
             player.AddScore(_scoreAmount);
-            Debug.Log($"[ScorePickup] Puntos añadidos: +{_scoreAmount}");
+            player.coins++;
+            BIT.Core.RuntimeGameManager.Instance?.AddCoins(1);
         }
     }
 

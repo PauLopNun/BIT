@@ -45,14 +45,23 @@ namespace BIT.Editor
             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
 
             int step = 0;
-            int total = 11;
+            int total = 12;
+
+            // Abrir gamesetupscene explícitamente antes de tocar nada.
+            // Si no se hace esto, los managers y el mapa van a la escena equivocada.
+            const string GAME_SCENE = "Assets/_Project/Scenes/gamesetupscene.unity";
+            if (System.IO.File.Exists(GAME_SCENE))
+                EditorSceneManager.OpenScene(GAME_SCENE, OpenSceneMode.Single);
 
             Progress(ref step, total, "Cortando tilesets PNG (16×16)…");
             BITAutoSetup.SetupTilesets();
 
-            Progress(ref step, total, "Configurando escena de juego…");
-            BITAutoSetup.SetupScene();
-            // gamesetupscene activa aquí — AudioManager y VFXManager presentes
+            Progress(ref step, total, "Configurando managers en gamesetupscene…");
+            BITAutoSetup.SetupSceneInternal(silent: true);
+
+            Progress(ref step, total, "Cargando mapa Kenney en gamesetupscene…");
+            DungeonMapGenerator.Generate();
+            // gamesetupscene activa aquí — mapa Kenney + managers presentes
 
             Progress(ref step, total, "Creando menú de pausa en la escena de juego…");
             CreatePauseMenuInScene();

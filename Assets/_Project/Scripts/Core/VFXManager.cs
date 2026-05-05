@@ -51,7 +51,7 @@ namespace BIT.Core
         void LoadVFXSprites()
         {
             LoadSlashSprites();
-            LoadKatanaSprites();
+            LoadWeaponSprite();
             Debug.Log("[VFXManager] Sistema VFX inicializado");
         }
 
@@ -77,8 +77,8 @@ namespace BIT.Core
         }
 
         // Cache de sprites de VFX de melee
-        private Sprite   _katanaInHandSprite;
-        private bool     _katanaLoaded;
+        private Sprite   _weaponInHandSprite;
+        private bool     _weaponLoaded;
         private Sprite[] _slashCurvedSprites;
         private bool     _slashLoaded;
 
@@ -91,23 +91,21 @@ namespace BIT.Core
         IEnumerator MeleeSlashEffect(Vector3 playerPos, Vector2 direction)
         {
             if (!_slashLoaded)  LoadSlashSprites();
-            if (!_katanaLoaded) LoadKatanaSprites();
+            if (!_weaponLoaded) LoadWeaponSprite();
 
             float baseAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
 
-            // Mostrar la Katana en mano durante el swing
-            if (_katanaInHandSprite != null)
-            {
-                StartCoroutine(SwingKatanaSprite(playerPos, direction, baseAngle));
-            }
+            // Lanzar el thrust del arma en paralelo (no bloqueante)
+            if (_weaponInHandSprite != null)
+                StartCoroutine(ThrustWeaponSprite(playerPos, direction, baseAngle));
 
-            // Animar el slash con SlashCurved o fallback procedural
+            // Animar el slash FX encima
             if (_slashCurvedSprites != null && _slashCurvedSprites.Length > 0)
             {
-                var go = new GameObject("KatanaSlashVFX");
-                go.transform.position = playerPos + (Vector3)direction * 0.8f;
+                var go = new GameObject("MeleeSlashVFX");
+                go.transform.position = playerPos + (Vector3)direction * 0.9f;
                 go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle - 90f);
-                go.transform.localScale = Vector3.one * 3f;
+                go.transform.localScale = Vector3.one * 1.2f;
 
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sortingOrder = 100;
@@ -117,8 +115,7 @@ namespace BIT.Core
                 {
                     if (go == null) yield break;
                     sr.sprite = _slashCurvedSprites[i];
-                    float alpha = 1f - (float)i / frames;
-                    sr.color = new Color(1f, 1f, 1f, alpha);
+                    sr.color = new Color(1f, 1f, 1f, 1f - (float)i / frames);
                     yield return new WaitForSeconds(0.04f);
                 }
                 if (go != null) Destroy(go);
@@ -129,29 +126,30 @@ namespace BIT.Core
             }
         }
 
-        IEnumerator SwingKatanaSprite(Vector3 playerPos, Vector2 direction, float baseAngle)
+        // El arma sale del personaje hacia adelante y desaparece — sin inventar rotaciones
+        IEnumerator ThrustWeaponSprite(Vector3 playerPos, Vector2 direction, float baseAngle)
         {
-            var go = new GameObject("KatanaWeaponVFX");
-            go.transform.position = playerPos + (Vector3)direction * 0.6f;
-            go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle - 90f);
-            go.transform.localScale = Vector3.one * 1.2f;
+            var go = new GameObject("WeaponThrustVFX");
+            go.transform.position = playerPos + (Vector3)direction * 0.2f;
+            // SpriteInHand de NinjaAdventure apunta hacia abajo en el fichero → +90° lo orienta en dir
+            go.transform.rotation = Quaternion.Euler(0f, 0f, baseAngle + 90f);
+            go.transform.localScale = Vector3.one * 1.25f;
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = _katanaInHandSprite;
+            sr.sprite      = _weaponInHandSprite;
             sr.sortingOrder = 101;
 
-            float duration = 0.22f;
-            float elapsed  = 0f;
-            float swingArc = 70f;
-            Vector3 startEuler = go.transform.eulerAngles;
+            float duration   = 0.22f;
+            float thrustDist = 1.2f;   // cuánto avanza hacia adelante
+            float elapsed    = 0f;
 
             while (elapsed < duration && go != null)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                go.transform.eulerAngles = startEuler + new Vector3(0f, 0f, -swingArc * t);
-                go.transform.position = playerPos + (Vector3)direction * (0.6f + t * 0.3f);
-                sr.color = new Color(1f, 1f, 1f, 1f - t * 0.6f);
+                // Avanza linealmente; fade out en el último 40%
+                go.transform.position = playerPos + (Vector3)direction * (0.2f + thrustDist * t);
+                sr.color = new Color(1f, 1f, 1f, t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f);
                 yield return null;
             }
             if (go != null) Destroy(go);
@@ -183,20 +181,30 @@ namespace BIT.Core
 #endif
         }
 
-        void LoadKatanaSprites()
+        void LoadWeaponSprite()
         {
-            _katanaLoaded = true;
+            _weaponLoaded = true;
 #if UNITY_EDITOR
-            // Cargar SpriteInHand de la Katana del item pack
-            const string IN_HAND = "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Katana/SpriteInHand.png";
-            const string SPRITE  = "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Katana/Sprite.png";
-            _katanaInHandSprite =
-                UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(IN_HAND)
-                ?? UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(SPRITE);
-            if (_katanaInHandSprite != null)
-                Debug.Log("[VFXManager] Katana SpriteInHand cargado");
-            else
-                Debug.LogWarning("[VFXManager] Katana SpriteInHand.png no encontrado");
+            // Prioridad: Lance2 → Lance → Sword → Katana (cualquiera que esté disponible)
+            string[] candidates = {
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Lance2/SpriteInHand.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Lance/SpriteInHand.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Lance2/Sprite.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Lance/Sprite.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Sword/SpriteInHand.png",
+                "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Katana/SpriteInHand.png",
+            };
+            foreach (var path in candidates)
+            {
+                _weaponInHandSprite = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path)
+                    .OfType<Sprite>().FirstOrDefault();
+                if (_weaponInHandSprite != null)
+                {
+                    Debug.Log($"[VFXManager] Arma melee cargada: {System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(path))}");
+                    return;
+                }
+            }
+            Debug.LogWarning("[VFXManager] Arma melee no encontrada — ejecuta BIT > 1b. Reconfigurar Sprites");
 #endif
         }
 

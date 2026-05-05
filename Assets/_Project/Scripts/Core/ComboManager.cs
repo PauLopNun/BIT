@@ -32,9 +32,9 @@ namespace BIT.Core
         public int CurrentCombo => _currentCombo;
 
         public float CurrentMultiplier =>
-            _currentCombo >= _killsForUltra ? 3f :
-            _currentCombo >= _killsForTriple ? 2f :
-            _currentCombo >= _killsForDouble ? 1.5f : 1f;
+            _currentCombo >= _killsForUltra ? 4f :
+            _currentCombo >= _killsForTriple ? 3f :
+            _currentCombo >= _killsForDouble ? 2f : 1f;
 
         void Awake()
         {
@@ -99,17 +99,17 @@ namespace BIT.Core
 
             if (_currentCombo >= _killsForUltra)
             {
-                label = $"ULTRA COMBO x3!\n{_currentCombo} kills";
+                label = $"ULTRA COMBO x4!\n{_currentCombo} kills";
                 color = new Color(1f, 0.3f, 0f);
             }
             else if (_currentCombo >= _killsForTriple)
             {
-                label = $"TRIPLE x2!\n{_currentCombo} kills";
+                label = $"TRIPLE x3!\n{_currentCombo} kills";
                 color = new Color(1f, 0.55f, 0f);
             }
             else if (_currentCombo >= _killsForDouble)
             {
-                label = $"DOBLE x1.5!\n{_currentCombo} kills";
+                label = $"DOBLE x2!\n{_currentCombo} kills";
                 color = new Color(1f, 0.85f, 0f);
             }
             else if (_currentCombo > 1)

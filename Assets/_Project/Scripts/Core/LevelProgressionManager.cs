@@ -49,30 +49,7 @@ namespace BIT.Core
 
         void CreateLevelUI()
         {
-            Canvas canvas = FindFirstObjectByType<Canvas>();
-            if (canvas == null) return;
-
-            _levelGO = new GameObject("LevelDisplay");
-            _levelGO.transform.SetParent(canvas.transform, false);
-
-            _levelText = _levelGO.AddComponent<Text>();
-            _levelText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _levelText.fontSize = 20;
-            _levelText.fontStyle = FontStyle.Bold;
-            _levelText.color = new Color(0.5f, 1f, 0.5f);
-            _levelText.alignment = TextAnchor.MiddleLeft;
-            _levelText.text = "Nivel 1";
-
-            Outline outline = _levelGO.AddComponent<Outline>();
-            outline.effectColor = Color.black;
-            outline.effectDistance = new Vector2(2, -2);
-
-            RectTransform rt = _levelGO.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0f, 0f);
-            rt.anchorMax = new Vector2(0f, 0f);
-            rt.pivot = new Vector2(0f, 0f);
-            rt.anchoredPosition = new Vector2(15f, 15f);
-            rt.sizeDelta = new Vector2(180f, 30f);
+            // Texto de nivel eliminado del HUD — la curación sigue funcionando internamente.
         }
 
         void OnWaveCleared(int wave)

@@ -82,6 +82,16 @@ namespace BIT.Editor
         // PASO 1: CORTAR TILESETS
         // ====================================================================
 
+        [MenuItem("BIT/1b. Reconfigurar Sprites FX y Armas (PPU=16)")]
+        public static void ReconfigureFXSpritesOnly()
+        {
+            ConfigureFXSprites();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog("BIT – Sprites OK",
+                "Sprites FX, Kunai y Katana reconfigurados a PPU=16.\n\nAhora pulsa Play.", "OK");
+        }
+
         [MenuItem("BIT/1. Configurar Tilesets (primera vez)")]
         public static void SetupTilesets()
         {
@@ -113,35 +123,58 @@ namespace BIT.Editor
         }
 
         // ====================================================================
-        // CONFIGURAR SPRITES FX Y PROYECTILES (PPU=16, Multiple si aplica)
+        // CONFIGURAR SPRITES FX, PROYECTILES Y ARMAS (PPU=16, Multiple si aplica)
         // ====================================================================
 
         static void ConfigureFXSprites()
         {
-            const string FX_ATTACK = "Assets/_Project/Sprites/Ninja Adventure/FX/Attack";
-            const string FX_PROJ   = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile";
-            const string WEAPON    = "Assets/_Project/Sprites/Ninja Adventure/Actor/CharacterAnimated/Weapon";
+            const string FX_ATTACK  = "Assets/_Project/Sprites/Ninja Adventure/FX/Attack";
+            const string FX_PROJ    = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile";
+            const string WEAPON     = "Assets/_Project/Sprites/Ninja Adventure/Actor/CharacterAnimated/Weapon";
+            const string ITEMS_WPN  = "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons";
 
-            // Sprite sheets de ataque (animaciones FX, cada frame ocupa todo el sheet o usa slices propios)
-            string[] fxSheets =
+            // (ruta, esHojaDeSprites)
+            // Las hojas se fuerzan a SpriteImportMode.Multiple si están en Single
+            var sprites = new (string path, bool isSheet)[]
             {
-                FX_ATTACK + "/CircularSlash/SpriteSheet.png",
-                FX_ATTACK + "/Claw/SpriteSheet.png",
-                FX_PROJ   + "/Shuriken/SpriteSheet.png",
-                FX_PROJ   + "/Kunai/SpriteSheet.png",
-                FX_PROJ   + "/Shuriken.png",
-                FX_PROJ   + "/Kunai.png",
-                FX_PROJ   + "/BigShuriken.png",
-                WEAPON    + "/Katana.png",
+                // Slash FX para melee katana
+                (FX_ATTACK + "/CircularSlash/SpriteSheet.png",  true),
+                (FX_ATTACK + "/SlashCurved/SpriteSheet.png",    true),
+                (FX_ATTACK + "/Cut/SpriteSheet.png",            true),
+                (FX_ATTACK + "/Claw/SpriteSheet.png",           true),
+                // Proyectiles FX animados
+                (FX_PROJ   + "/Shuriken/SpriteSheet.png",       true),
+                (FX_PROJ   + "/Kunai/SpriteSheet.png",          true),
+                // Proyectiles FX individuales
+                (FX_PROJ   + "/Shuriken.png",                   false),
+                (FX_PROJ   + "/Kunai.png",                      false),
+                (FX_PROJ   + "/BigShuriken.png",                false),
+                // Arma del personaje animada
+                (WEAPON    + "/Katana.png",                     false),
+                // Items: Lanza para VFX de melee (thrust desde el personaje)
+                (ITEMS_WPN  + "/Lance/Sprite.png",              false),
+                (ITEMS_WPN  + "/Lance/SpriteInHand.png",        false),
+                (ITEMS_WPN  + "/Lance2/Sprite.png",             false),
+                (ITEMS_WPN  + "/Lance2/SpriteInHand.png",       false),
+                // Items: Espada como fallback de melee
+                (ITEMS_WPN  + "/Sword/SpriteInHand.png",        false),
+                (ITEMS_WPN  + "/Katana/SpriteInHand.png",       false),
             };
 
             int configured = 0;
-            foreach (var path in fxSheets)
+            foreach (var (path, isSheet) in sprites)
             {
                 var imp = AssetImporter.GetAtPath(path) as TextureImporter;
                 if (imp == null) continue;
 
                 bool changed = false;
+
+                // Garantizar que sea de tipo Sprite (no Default/Normal)
+                if (imp.textureType != TextureImporterType.Sprite)
+                {
+                    imp.textureType = TextureImporterType.Sprite;
+                    changed = true;
+                }
                 if (imp.spritePixelsPerUnit != 16f)
                 {
                     imp.spritePixelsPerUnit = 16f;
@@ -152,19 +185,23 @@ namespace BIT.Editor
                     imp.filterMode = FilterMode.Point;
                     changed = true;
                 }
-                // Sólo forzar Single en los sprites de una sola imagen (no las hojas de animación)
-                if (imp.spriteImportMode == SpriteImportMode.Single && path.Contains("SpriteSheet"))
+                // Las hojas de animación deben estar en Multiple para que LoadAllAssetsAtPath
+                // devuelva los frames individuales. Si ya es Multiple no se toca.
+                if (isSheet && imp.spriteImportMode == SpriteImportMode.Single)
                 {
-                    // No cambiar hojas de animación ya configuradas como Multiple
+                    imp.spriteImportMode = SpriteImportMode.Multiple;
+                    changed = true;
                 }
+
                 if (changed)
                 {
                     imp.SaveAndReimport();
                     configured++;
                 }
             }
+
             if (configured > 0)
-                Debug.Log($"[BITAutoSetup] {configured} sprites FX reconfigurados a PPU=16");
+                Debug.Log($"[BITAutoSetup] {configured} sprites FX/armas reconfigurados a PPU=16, type=Sprite");
         }
 
         // ====================================================================
@@ -172,16 +209,23 @@ namespace BIT.Editor
         // ====================================================================
 
         [MenuItem("BIT/2. Configurar Escena (Auto)")]
-        public static void SetupScene()
+        public static void SetupScene() => SetupSceneInternal(silent: false);
+
+        // Versión interna sin [MenuItem] para que BITFullSetup la llame con silent=true
+        public static void SetupSceneInternal(bool silent = false)
         {
             // Auto-ejecutar paso 1 si los tiles no existen todavía
             if (!TilesReady())
             {
-                bool run = EditorUtility.DisplayDialog("BIT – Tilesets necesarios",
-                    "Los tile assets no están configurados.\n¿Ejecutar 'Configurar Tilesets' automáticamente?",
-                    "Sí", "Cancelar");
-                if (!run) return;
-                SetupTilesets();
+                if (silent) { SetupTilesets(); }
+                else
+                {
+                    bool run = EditorUtility.DisplayDialog("BIT – Tilesets necesarios",
+                        "Los tile assets no están configurados.\n¿Ejecutar 'Configurar Tilesets' automáticamente?",
+                        "Sí", "Cancelar");
+                    if (!run) return;
+                    SetupTilesets();
+                }
             }
 
             EditorUtility.DisplayProgressBar("BIT – Escena", "Configurando tags…", 0.05f);
@@ -190,8 +234,12 @@ namespace BIT.Editor
             EditorUtility.DisplayProgressBar("BIT – Escena", "Creando managers…", 0.15f);
             SetupManagers();
 
-            EditorUtility.DisplayProgressBar("BIT – Escena", "Generando mapa dungeon…", 0.35f);
-            DungeonMapGenerator.Generate();
+            // El mapa lo genera el llamador cuando silent=true (BITFullSetup lo hace en un paso propio)
+            if (!silent)
+            {
+                EditorUtility.DisplayProgressBar("BIT – Escena", "Generando mapa dungeon…", 0.35f);
+                DungeonMapGenerator.Generate();
+            }
 
             EditorUtility.DisplayProgressBar("BIT – Escena", "Colocando jugador…", 0.70f);
             PlacePlayer();
@@ -204,17 +252,20 @@ namespace BIT.Editor
             AssetDatabase.SaveAssets();
             EditorUtility.ClearProgressBar();
 
-            EditorUtility.DisplayDialog("BIT – Escena Lista",
-                "¡Escena configurada!\n\n" +
-                "Managers añadidos:\n" +
-                "  • RuntimeGameManager\n" +
-                "  • WaveManager\n" +
-                "  • ComboManager\n" +
-                "  • LevelProgressionManager\n" +
-                "  • WaveUpgradeSystem\n" +
-                "  • VFXManager\n\n" +
-                "Guarda la escena (Ctrl+S) y pulsa Play.",
-                "OK");
+            if (!silent)
+            {
+                EditorUtility.DisplayDialog("BIT – Escena Lista",
+                    "¡Escena configurada!\n\n" +
+                    "Managers añadidos:\n" +
+                    "  • RuntimeGameManager\n" +
+                    "  • WaveManager\n" +
+                    "  • ComboManager\n" +
+                    "  • LevelProgressionManager\n" +
+                    "  • WaveUpgradeSystem\n" +
+                    "  • VFXManager\n\n" +
+                    "Guarda la escena (Ctrl+S) y pulsa Play.",
+                    "OK");
+            }
         }
 
         // ====================================================================
@@ -239,6 +290,10 @@ namespace BIT.Editor
             importer.filterMode             = FilterMode.Point;
             importer.textureCompression     = TextureImporterCompression.Uncompressed;
             importer.isReadable             = true;
+            var ts = new TextureImporterSettings();
+            importer.ReadTextureSettings(ts);
+            ts.spriteMeshType = SpriteMeshType.FullRect;
+            importer.SetTextureSettings(ts);
             importer.SaveAndReimport();
 
             var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(pngPath);
@@ -377,6 +432,13 @@ namespace BIT.Editor
             TrySetPrefab(so, "_basicEnemyPrefab", "Enemy_Skeleton");
             TrySetPrefab(so, "_fastEnemyPrefab",  "Enemy_Dragon");
             TrySetPrefab(so, "_tankEnemyPrefab",  "Enemy_Cyclope");
+            TrySetPrefab(so, "_bossPrefab",        "Enemy_Dragon");
+
+            // Boss cada 3 rondas por defecto
+            var bossWavesProp = so.FindProperty("_bossEveryNWaves");
+            if (bossWavesProp != null && bossWavesProp.intValue != 3)
+                bossWavesProp.intValue = 3;
+
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -394,7 +456,17 @@ namespace BIT.Editor
 
         static void PlacePlayer()
         {
-            if (GameObject.FindGameObjectWithTag("Player") != null) return;
+            // Posición segura dentro del mapa Kenney: col 9, row 12 del TMX
+            // = zona de suelo abierta rodeada de tiles floor en todas las direcciones
+            var safeSpawn = new Vector3(-7f, -3f, 0f);
+
+            // Si ya existe, solo reposicionar (por si está dentro de una pared del mapa)
+            var existing = GameObject.FindGameObjectWithTag("Player");
+            if (existing != null)
+            {
+                existing.transform.position = safeSpawn;
+                return;
+            }
 
             var guids = AssetDatabase.FindAssets("t:Prefab Player", new[] { PREFABS });
             if (guids.Length == 0) return;
@@ -403,7 +475,7 @@ namespace BIT.Editor
             if (prefab == null) return;
 
             var go = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-            if (go != null) go.transform.position = Vector3.zero;
+            if (go != null) go.transform.position = safeSpawn;
         }
 
         // ====================================================================

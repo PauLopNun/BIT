@@ -65,6 +65,9 @@ namespace BIT.Core
         private float _strafeAmplitude;
         private float _speedVariance;
 
+        private Vector2 _lastFixedPos;
+        private float _stuckTimer;
+
         // Hash de parámetros del animator para optimización
         private static readonly int ANIM_SPEED = Animator.StringToHash("Speed");
         private static readonly int ANIM_MOVEX = Animator.StringToHash("MoveX");
@@ -169,31 +172,46 @@ namespace BIT.Core
 
             float distance = Vector2.Distance(transform.position, _player.position);
 
-            // Si el jugador está en rango de detección y no demasiado cerca
-            if (distance < detectionRange && distance > stoppingDistance)
+            // Siempre perseguir — no hay rango de detección: los enemigos spawnan cerca
+            // del jugador y deben atacar siempre.
+            if (distance > stoppingDistance)
             {
                 _moveDirection = ((Vector2)_player.position - (Vector2)transform.position).normalized;
 
-                // Perpendicular zigzag so enemies don't all rush in a straight line
                 _strafeTimer += Time.fixedDeltaTime;
                 Vector2 perp = new Vector2(-_moveDirection.y, _moveDirection.x);
                 float strafe = Mathf.Sin(_strafeTimer * _strafeFrequency * Mathf.PI * 2f) * _strafeAmplitude;
                 Vector2 finalDir = (_moveDirection + perp * strafe).normalized;
 
                 _rb.linearVelocity = finalDir * (moveSpeed * _speedVariance);
+
+                // Desatascarse: si lleva 0.4s sin moverse, empuje aleatorio
+                if (((Vector2)transform.position - _lastFixedPos).sqrMagnitude < 0.0004f)
+                {
+                    _stuckTimer += Time.fixedDeltaTime;
+                    if (_stuckTimer > 0.4f)
+                    {
+                        _rb.linearVelocity = Random.insideUnitCircle.normalized * moveSpeed * 1.5f;
+                        _stuckTimer = 0f;
+                    }
+                }
+                else
+                {
+                    _stuckTimer = 0f;
+                }
             }
             else
             {
-                // Fuera de rango o demasiado cerca - detenerse
                 _rb.linearVelocity = Vector2.zero;
                 _moveDirection = Vector2.zero;
+                _stuckTimer = 0f;
             }
 
-            // Daño por proximidad: si el jugador está muy cerca aunque no haya colisión física
+            _lastFixedPos = transform.position;
+
+            // Daño por proximidad
             if (distance < stoppingDistance + 0.4f)
-            {
                 TryDamagePlayer(_player.gameObject);
-            }
         }
 
         // ====================================================================

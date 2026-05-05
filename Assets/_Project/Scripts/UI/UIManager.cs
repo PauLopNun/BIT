@@ -103,6 +103,9 @@ namespace BIT.UI
         [Tooltip("Texto de puntuación final en Game Over")]
         [SerializeField] private TextMeshProUGUI _finalScoreText;
 
+        // Escala original del texto de puntuación (cacheada en Start para que la animación no la acumule)
+        private Vector3 _scoreTextOriginalScale = Vector3.one;
+
         // ====================================================================
         // SECCIÓN 3: INICIALIZACIÓN
         // ====================================================================
@@ -133,6 +136,10 @@ namespace BIT.UI
 
             // Suscribimos a los eventos de PlayerStats
             SubscribeToEvents();
+
+            // Cacheamos la escala original del score para la animación de pop
+            if (_scoreText != null)
+                _scoreTextOriginalScale = _scoreText.transform.localScale;
 
             // Actualizamos la UI con los valores iniciales
             if (_playerStats != null)
@@ -277,20 +284,12 @@ namespace BIT.UI
         {
             if (_scoreText == null) yield break;
 
-            // Guardamos la escala original
-            Vector3 originalScale = _scoreText.transform.localScale;
-
-            // Agrandamos un poco
-            _scoreText.transform.localScale = originalScale * 1.2f;
-
-            // Actualizamos el texto
+            _scoreText.transform.localScale = _scoreTextOriginalScale * 1.2f;
             _scoreText.text = $"{_scorePrefix}{newScore}";
 
-            // Esperamos un frame
             yield return new WaitForSeconds(0.1f);
 
-            // Volvemos a la escala original
-            _scoreText.transform.localScale = originalScale;
+            _scoreText.transform.localScale = _scoreTextOriginalScale;
         }
 
         // ====================================================================
