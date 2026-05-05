@@ -261,17 +261,7 @@ namespace BIT.Editor
                 mainPanel.SetActive(true);
             });
 
-            // ── Wire MainMenuUI references ────────────────────────────────
-            var soMenu = new SerializedObject(mainMenuUI);
-            soMenu.FindProperty("_playButton").objectReferenceValue      = playBtn.GetComponent<Button>();
-            soMenu.FindProperty("_rankingButton").objectReferenceValue   = rankBtn.GetComponent<Button>();
-            soMenu.FindProperty("_quitButton").objectReferenceValue      = quitBtn.GetComponent<Button>();
-            soMenu.FindProperty("_playerNameInput").objectReferenceValue = nameInput;
-            soMenu.FindProperty("_mainPanel").objectReferenceValue       = mainPanel;
-            soMenu.FindProperty("_rankingPanel").objectReferenceValue    = rankingPanel;
-            soMenu.FindProperty("_highScoreText").objectReferenceValue   = hsTMP;
-            soMenu.FindProperty("_versionText").objectReferenceValue     = verTMP;
-            soMenu.ApplyModifiedProperties();
+            // MainMenuUI construye su propia UI en runtime — no necesita wiring manual.
 
             // ── Wire RankingUI references ─────────────────────────────────
             var rankingEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
