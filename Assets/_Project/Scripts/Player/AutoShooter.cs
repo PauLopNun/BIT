@@ -1,6 +1,5 @@
 using UnityEngine;
-using System.Linq;
-using BIT.Player;
+using BIT.Core;
 
 namespace BIT.Player
 {
@@ -98,19 +97,18 @@ namespace BIT.Player
             if (_bulletSprite != null) return _bulletSprite;
 
             // Shuriken: sprite 15×15, forma de estrella correcta
-#if UNITY_EDITOR
             const string SHURIKEN_PATH = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken.png";
-            var loaded = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SHURIKEN_PATH).OfType<Sprite>().FirstOrDefault();
+            var loaded = RuntimeAssetLoader.LoadFirstSprite(SHURIKEN_PATH);
             if (loaded != null) { _bulletSprite = loaded; return _bulletSprite; }
 
             const string KUNAI_PATH = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Kunai.png";
-            loaded = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(KUNAI_PATH).OfType<Sprite>().FirstOrDefault();
+            loaded = RuntimeAssetLoader.LoadFirstSprite(KUNAI_PATH);
             if (loaded != null) { _bulletSprite = loaded; return _bulletSprite; }
 
             const string KUNAI_SHEET = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Kunai/SpriteSheet.png";
-            loaded = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(KUNAI_SHEET).OfType<Sprite>().FirstOrDefault();
+            loaded = RuntimeAssetLoader.LoadFirstSprite(KUNAI_SHEET);
             if (loaded != null) { _bulletSprite = loaded; return _bulletSprite; }
-#endif
+
             // Fallback procedural: estrella de 4 puntas
             var tex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
             var pixels = new Color[1024];

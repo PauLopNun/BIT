@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections;
-using System.Linq;
 
 // ============================================================================
 // VFXMANAGER.CS - Sistema de efectos visuales
@@ -172,7 +171,6 @@ namespace BIT.Core
         void LoadWeaponSprite()
         {
             _weaponLoaded = true;
-#if UNITY_EDITOR
             string[] candidates = {
                 "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/BigSword/Sprite.png",
                 "Assets/_Project/Sprites/Ninja Adventure/Items/Weapons/Sword/Sprite.png",
@@ -181,8 +179,7 @@ namespace BIT.Core
             };
             foreach (var path in candidates)
             {
-                _weaponInHandSprite = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path)
-                    .OfType<Sprite>().FirstOrDefault();
+                _weaponInHandSprite = RuntimeAssetLoader.LoadFirstSprite(path);
                 if (_weaponInHandSprite != null)
                 {
                     Debug.Log($"[VFXManager] Arma melee cargada: {System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(path))}");
@@ -190,7 +187,6 @@ namespace BIT.Core
                 }
             }
             Debug.LogWarning("[VFXManager] Arma melee no encontrada — ejecuta BIT > 1b. Reconfigurar Sprites");
-#endif
         }
 
         IEnumerator ProceduralSwordSwing(Vector3 playerPos, float baseAngle)

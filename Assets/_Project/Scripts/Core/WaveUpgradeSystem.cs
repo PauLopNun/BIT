@@ -103,9 +103,8 @@ namespace BIT.Core
                 Destroy(child.gameObject);
             _cards.Clear();
 
-            int wave = WaveManager.Instance != null ? WaveManager.Instance.CurrentWave : 1;
-            CreateLabel("¡RECOMPENSA DE BOSS!", 38, new Color(1f, 0.75f, 0f), new Vector2(0f, 0.87f), new Vector2(1f, 1f));
-            CreateLabel("¡Elige UNA mejora GRATIS por derrotar al boss!", 18,
+            CreateLabel("¡RECOMPENSA DE BOSS!", 42, new Color(1f, 0.75f, 0f), new Vector2(0f, 0.87f), new Vector2(1f, 1f));
+            CreateLabel("¡Elige UNA mejora GRATIS por derrotar al boss!", 22,
                 new Color(0.85f, 0.85f, 0.85f), new Vector2(0f, 0.79f), new Vector2(1f, 0.87f));
 
             float totalSpacing = 1f - chosen.Count * 0.30f;
@@ -144,9 +143,9 @@ namespace BIT.Core
             outline.effectColor    = new Color(1f, 0.75f, 0f, 0.8f);
             outline.effectDistance = new Vector2(3, -3);
 
-            AddCardText(card, option.name,        20, FontStyles.Bold,   new Color(1f, 0.88f, 0.2f), new Vector2(0f, 0.68f), new Vector2(1f, 1f));
-            AddCardText(card, option.description, 16, FontStyles.Normal, Color.white,                new Vector2(0f, 0.22f), new Vector2(1f, 0.68f));
-            AddCardText(card, "GRATIS",           22, FontStyles.Bold,   new Color(0.3f, 1f, 0.4f), new Vector2(0f, 0f),    new Vector2(1f, 0.22f));
+            AddCardText(card, option.name,        23, FontStyles.Bold,   new Color(1f, 0.88f, 0.2f), new Vector2(0f, 0.68f), new Vector2(1f, 1f));
+            AddCardText(card, option.description, 18, FontStyles.Normal, Color.white,                new Vector2(0f, 0.22f), new Vector2(1f, 0.68f));
+            AddCardText(card, "GRATIS",           24, FontStyles.Bold,   new Color(0.3f, 1f, 0.4f), new Vector2(0f, 0f),    new Vector2(1f, 0.22f));
 
             var entry = new CardEntry
             {
@@ -235,8 +234,8 @@ namespace BIT.Core
             }
 
             string discountLabel = wave <= 2 ? " — ¡50% descuento!" : wave <= 4 ? " — ¡25% descuento!" : "";
-            CreateLabel("¡TIENDA!", 42, new Color(1f, 0.88f, 0.15f), new Vector2(0f, 0.87f), new Vector2(1f, 1f));
-            CreateLabel($"Oleada {wave} superada — gasta tus monedas{discountLabel}", 18,
+            CreateLabel("¡TIENDA!", 46, new Color(1f, 0.88f, 0.15f), new Vector2(0f, 0.87f), new Vector2(1f, 1f));
+            CreateLabel($"Oleada {wave} superada — gasta tus monedas{discountLabel}", 22,
                 new Color(0.75f, 0.75f, 0.75f), new Vector2(0f, 0.79f), new Vector2(1f, 0.87f));
 
             // Balance de monedas
@@ -244,7 +243,7 @@ namespace BIT.Core
             balGO.transform.SetParent(_shopPanel.transform, false);
             _coinBalanceText = balGO.AddComponent<Text>();
             _coinBalanceText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _coinBalanceText.fontSize = 26;
+            _coinBalanceText.fontSize = 30;
             _coinBalanceText.fontStyle = FontStyle.Bold;
             _coinBalanceText.color = new Color(1f, 0.85f, 0.1f);
             _coinBalanceText.alignment = TextAnchor.MiddleCenter;
@@ -305,7 +304,7 @@ namespace BIT.Core
             var nameText = nameGO.AddComponent<Text>();
             nameText.text      = option.name;
             nameText.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            nameText.fontSize  = 20;
+            nameText.fontSize  = 26;
             nameText.fontStyle = FontStyle.Bold;
             nameText.color     = new Color(1f, 0.85f, 0.28f);
             nameText.alignment = TextAnchor.MiddleCenter;
@@ -321,7 +320,7 @@ namespace BIT.Core
             var descText = descGO.AddComponent<Text>();
             descText.text      = option.description;
             descText.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            descText.fontSize  = 16;
+            descText.fontSize  = 20;
             descText.color     = Color.white;
             descText.alignment = TextAnchor.MiddleCenter;
             var descRT = descGO.GetComponent<RectTransform>();
@@ -336,7 +335,7 @@ namespace BIT.Core
             var priceText = priceGO.AddComponent<Text>();
             priceText.text      = $"$ {option.cost} monedas";
             priceText.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            priceText.fontSize  = 20;
+            priceText.fontSize  = 25;
             priceText.fontStyle = FontStyle.Bold;
             priceText.color     = new Color(1f, 0.85f, 0.1f);
             priceText.alignment = TextAnchor.MiddleCenter;
@@ -433,7 +432,7 @@ namespace BIT.Core
             var labelText = labelGO.AddComponent<Text>();
             labelText.text      = "SIGUIENTE RONDA  →";
             labelText.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            labelText.fontSize  = 22;
+            labelText.fontSize  = 25;
             labelText.fontStyle = FontStyle.Bold;
             labelText.color     = Color.white;
             labelText.alignment = TextAnchor.MiddleCenter;

@@ -58,21 +58,23 @@ namespace BIT.Core
 
             _comboText = _comboGO.AddComponent<Text>();
             _comboText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _comboText.fontSize = 44;
+            _comboText.fontSize = 30;
             _comboText.fontStyle = FontStyle.Bold;
             _comboText.alignment = TextAnchor.MiddleCenter;
             _comboText.color = new Color(1f, 0.85f, 0f);
+            _comboText.horizontalOverflow = HorizontalWrapMode.Overflow;
+            _comboText.verticalOverflow = VerticalWrapMode.Overflow;
 
             Outline outline = _comboGO.AddComponent<Outline>();
             outline.effectColor = new Color(0.4f, 0.15f, 0f);
-            outline.effectDistance = new Vector2(3, -3);
+            outline.effectDistance = new Vector2(2, -2);
 
             RectTransform rt = _comboGO.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(1f, 0f);
             rt.anchorMax = new Vector2(1f, 0f);
             rt.pivot = new Vector2(1f, 0f);
-            rt.anchoredPosition = new Vector2(-20f, 20f);
-            rt.sizeDelta = new Vector2(280f, 70f);
+            rt.anchoredPosition = new Vector2(-20f, 18f);
+            rt.sizeDelta = new Vector2(320f, 70f);
 
             _comboGO.SetActive(false);
         }

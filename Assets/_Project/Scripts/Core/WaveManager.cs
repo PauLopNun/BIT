@@ -16,10 +16,9 @@ using BIT.UI;
 //   → muestra mensaje "Ronda X superada!" → pausa breve → siguiente ronda
 //
 // ESCALADO DE DIFICULTAD:
-//   Oleada 1:  3 enemigos básicos
-//   Oleada 3+: aparecen enemigos rápidos
-//   Oleada 5+: aparecen enemigos fuertes
-//   Cada 5 rondas: oleada con el doble de enemigos ("Horda")
+//   Oleada 1+: mezcla enemigo basico, rapido, fuerte y a distancia
+//   Oleadas siguientes: sube el numero de enemigos y escalan sus stats
+//   Cada N rondas: oleada especial de boss u horda
 // ============================================================================
 
 namespace BIT.Core
@@ -39,17 +38,17 @@ namespace BIT.Core
         [Tooltip("Enemigo básico (siempre disponible desde ronda 1)")]
         [SerializeField] private GameObject _basicEnemyPrefab;
 
-        [Tooltip("Enemigo rápido (disponible desde ronda 3)")]
+        [Tooltip("Enemigo rápido (disponible desde ronda 1)")]
         [SerializeField] private GameObject _fastEnemyPrefab;
 
-        [Tooltip("Enemigo fuerte (disponible desde ronda 5)")]
+        [Tooltip("Enemigo fuerte (disponible desde ronda 1)")]
         [SerializeField] private GameObject _tankEnemyPrefab;
 
-        [Tooltip("Enemigo a distancia (si está vacío se crea en runtime a partir de ronda 4)")]
+        [Tooltip("Enemigo a distancia (si está vacío se crea en runtime desde ronda 1)")]
         [SerializeField] private GameObject _rangedEnemyPrefab;
 
         [Tooltip("Ronda a partir de la cual aparecen enemigos a distancia")]
-        [SerializeField] private int _rangedEnemyUnlockWave = 4;
+        [SerializeField] private int _rangedEnemyUnlockWave = 1;
 
         [Header("=== BOSS ===")]
         [Tooltip("Prefab del boss (si está vacío se usa el enemigo fuerte con stats escalados x8)")]
@@ -66,10 +65,10 @@ namespace BIT.Core
         [SerializeField] private int _enemiesPerRoundIncrease = 1;
 
         [Tooltip("Ronda a partir de la cual aparecen enemigos rápidos")]
-        [SerializeField] private int _fastEnemyUnlockWave = 4;
+        [SerializeField] private int _fastEnemyUnlockWave = 1;
 
         [Tooltip("Ronda a partir de la cual aparecen enemigos fuertes")]
-        [SerializeField] private int _tankEnemyUnlockWave = 7;
+        [SerializeField] private int _tankEnemyUnlockWave = 1;
 
         [Tooltip("Cada cuántas rondas hay una 'Horda' (x1.5 enemigos). 0 = desactivado")]
         [SerializeField] private int _hordeEveryNWaves = 8;
@@ -132,6 +131,15 @@ namespace BIT.Core
                 return;
             }
             Instance = this;
+
+            EnsureEarlyEnemyVariety();
+        }
+
+        private void EnsureEarlyEnemyVariety()
+        {
+            _fastEnemyUnlockWave = 1;
+            _tankEnemyUnlockWave = 1;
+            _rangedEnemyUnlockWave = 1;
         }
 
         private void Start()
@@ -218,7 +226,7 @@ namespace BIT.Core
                     if (GameManager.Instance != null && !GameManager.Instance.IsPlaying)
                         yield break;
 
-                    GameObject enemy = SpawnEnemy();
+                    GameObject enemy = SpawnEnemy(i);
                     if (enemy != null)
                         _activeEnemies.Add(enemy);
 
@@ -324,10 +332,14 @@ namespace BIT.Core
         {
             // Curva no lineal: arranca con fuerza y crece más despacio
             // wave 1=5, 2=8, 4=10, 5=11, 7=12, 8=13, 10+=14 (cap)
-            int count;
-            if (_currentWave == 1)      count = 5;
-            else if (_currentWave == 2) count = 8;
-            else                        count = Mathf.Min(14, 8 + (_currentWave - 2));
+            int configuredCount = Mathf.Max(1,
+                _baseEnemyCount + ((_currentWave - 1) * Mathf.Max(0, _enemiesPerRoundIncrease)));
+            int curveCount;
+            if (_currentWave == 1)      curveCount = 5;
+            else if (_currentWave == 2) curveCount = 8;
+            else                        curveCount = Mathf.Min(14, 8 + (_currentWave - 2));
+
+            int count = Mathf.Max(configuredCount, curveCount);
 
             bool isBossWave = _bossEveryNWaves > 0 && _currentWave % _bossEveryNWaves == 0;
             if (!isBossWave && _hordeEveryNWaves > 0 && _currentWave % _hordeEveryNWaves == 0)
@@ -382,29 +394,33 @@ namespace BIT.Core
         // ====================================================================
 
         /// <summary>Spawna un enemigo en una posición válida.</summary>
-        private GameObject SpawnEnemy()
+        private GameObject SpawnEnemy(int spawnIndex)
         {
             Vector3 spawnPos = GetSpawnPosition();
-            GameObject enemy;
+            GameObject enemy = TrySpawnGuaranteedVarietyEnemy(spawnPos, spawnIndex);
 
-            float roll = Random.value;
-            // 20% chance de enemigo pesado (Cyclope) desde ronda 5
-            if (_currentWave >= 5 && roll < 0.20f)
+            if (enemy == null)
             {
-                enemy = CreateHeavyEnemyAtRuntime(spawnPos);
-            }
-            // 20% chance de enemigo a distancia desde ronda desbloqueada
-            else if (_currentWave >= _rangedEnemyUnlockWave && roll < 0.40f)
-            {
-                enemy = _rangedEnemyPrefab != null
-                    ? Instantiate(_rangedEnemyPrefab, spawnPos, Quaternion.identity)
-                    : CreateRangedEnemyAtRuntime(spawnPos);
-            }
-            else
-            {
-                GameObject prefab = ChooseEnemyPrefab();
-                if (prefab == null) return null;
-                enemy = Instantiate(prefab, spawnPos, Quaternion.identity);
+                float roll = Random.value;
+                // Enemigo pesado (Cyclope): desde ronda 1, probabilidad crece con las oleadas
+                float heavyChance = _currentWave >= 5 ? 0.22f : _currentWave >= 3 ? 0.15f : 0.08f;
+                if (roll < heavyChance)
+                {
+                    enemy = CreateHeavyEnemyAtRuntime(spawnPos);
+                }
+                // Enemigo a distancia desde rondas tempranas para aportar variedad visual.
+                else if (_currentWave >= _rangedEnemyUnlockWave && roll < 0.40f)
+                {
+                    enemy = _rangedEnemyPrefab != null
+                        ? Instantiate(_rangedEnemyPrefab, spawnPos, Quaternion.identity)
+                        : CreateRangedEnemyAtRuntime(spawnPos);
+                }
+                else
+                {
+                    GameObject prefab = ChooseEnemyPrefab();
+                    if (prefab == null) return null;
+                    enemy = Instantiate(prefab, spawnPos, Quaternion.identity);
+                }
             }
 
             ScaleEnemyStats(enemy);
@@ -422,6 +438,27 @@ namespace BIT.Core
             }
 
             return enemy;
+        }
+
+        private GameObject TrySpawnGuaranteedVarietyEnemy(Vector3 spawnPos, int spawnIndex)
+        {
+            if (spawnIndex == 0 && _basicEnemyPrefab != null)
+                return Instantiate(_basicEnemyPrefab, spawnPos, Quaternion.identity);
+
+            if (spawnIndex == 1 && _currentWave >= _fastEnemyUnlockWave && _fastEnemyPrefab != null)
+                return Instantiate(_fastEnemyPrefab, spawnPos, Quaternion.identity);
+
+            if (spawnIndex == 2 && _currentWave >= _tankEnemyUnlockWave && _tankEnemyPrefab != null)
+                return Instantiate(_tankEnemyPrefab, spawnPos, Quaternion.identity);
+
+            if (spawnIndex == 3 && _currentWave >= _rangedEnemyUnlockWave)
+            {
+                return _rangedEnemyPrefab != null
+                    ? Instantiate(_rangedEnemyPrefab, spawnPos, Quaternion.identity)
+                    : CreateRangedEnemyAtRuntime(spawnPos);
+            }
+
+            return null;
         }
 
         private GameObject CreateRangedEnemyAtRuntime(Vector3 pos)
@@ -532,28 +569,12 @@ namespace BIT.Core
 
         static GameObject LoadPickupPrefab(string name)
         {
-#if UNITY_EDITOR
-            var guids = UnityEditor.AssetDatabase.FindAssets(
-                $"t:Prefab {name}", new[] { "Assets/_Project/Prefabs/Pickups" });
-            if (guids.Length > 0)
-                return UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
-                    UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]));
-#endif
-            return null;
+            return RuntimeAssetLoader.LoadPickupPrefab(name);
         }
 
         static Sprite LoadFirstAvailableSprite(params string[] paths)
         {
-#if UNITY_EDITOR
-            foreach (var path in paths)
-            {
-                var sp = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
-                if (sp != null) return sp;
-                foreach (var a in UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path))
-                    if (a is Sprite s) return s;
-            }
-#endif
-            return null;
+            return RuntimeAssetLoader.LoadFirstAvailableSprite(paths);
         }
 
         /// <summary>Escala las estadísticas del enemigo según la ronda.</summary>

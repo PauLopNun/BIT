@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using System.Linq;
+using BIT.Core;
 
 // ============================================================================
 // PLAYERCONTROLLER.CS - Controlador principal del jugador
@@ -722,7 +722,6 @@ namespace BIT.Player
 
             if (_cachedShurikenSprite == null)
             {
-#if UNITY_EDITOR
                 // Prioridad: sprite individual limpio (no SpriteSheet) → frame 0 del SpriteSheet → BigShuriken
                 string[] singles = {
                     "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken.png",
@@ -731,21 +730,16 @@ namespace BIT.Player
                 };
                 foreach (var p in singles)
                 {
-                    _cachedShurikenSprite = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(p)
-                        .OfType<Sprite>().FirstOrDefault();
+                    _cachedShurikenSprite = RuntimeAssetLoader.LoadFirstSprite(p);
                     if (_cachedShurikenSprite != null) break;
                 }
                 // Fallback: frame 0 del SpriteSheet (ordenado por índice para evitar frames transparentes)
                 if (_cachedShurikenSprite == null)
                 {
                     const string SHEET = "Assets/_Project/Sprites/Ninja Adventure/FX/Projectile/Shuriken/SpriteSheet.png";
-                    _cachedShurikenSprite = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(SHEET)
-                        .OfType<Sprite>()
-                        .OrderBy(s => { int i = s.name.LastIndexOf('_'); return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999; })
-                        .FirstOrDefault();
+                    _cachedShurikenSprite = RuntimeAssetLoader.LoadFirstSprite(SHEET);
                 }
                 Debug.Log($"[Player] Shuriken sprite: {(_cachedShurikenSprite != null ? _cachedShurikenSprite.name : "NULL — fallback estrella")}");
-#endif
             }
 
             if (_cachedShurikenSprite != null)
@@ -941,16 +935,11 @@ namespace BIT.Player
             {
                 _baseColor = data.spriteColor;
                 spriteRenderer.color = data.spriteColor;
-#if UNITY_EDITOR
                 if (!string.IsNullOrEmpty(data.spritePath))
                 {
-                    var sprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(data.spritePath);
-                    foreach (var a in sprites)
-                    {
-                        if (a is Sprite s) { spriteRenderer.sprite = s; break; }
-                    }
+                    Sprite sprite = RuntimeAssetLoader.LoadFirstSprite(data.spritePath);
+                    if (sprite != null) spriteRenderer.sprite = sprite;
                 }
-#endif
             }
 
             // Actualizar UI con la nueva vida máxima
@@ -969,7 +958,6 @@ namespace BIT.Player
 
         void LoadCharacterSprites(string idlePath)
         {
-#if UNITY_EDITOR
             if (string.IsNullOrEmpty(idlePath)) return;
 
             string dir = System.IO.Path.GetDirectoryName(idlePath).Replace("\\", "/");
@@ -978,24 +966,12 @@ namespace BIT.Player
             _attackSprites = LoadSortedSprites(dir + "/Attack.png");
 
             Debug.Log($"[Player] Sprites cargados — Idle:{_idleSprites?.Length} Walk:{_walkSprites?.Length} Attack:{_attackSprites?.Length}");
-#endif
         }
 
         static Sprite[] LoadSortedSprites(string path)
         {
-#if UNITY_EDITOR
-            var sprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path)
-                .OfType<Sprite>()
-                .OrderBy(s =>
-                {
-                    int i = s.name.LastIndexOf('_');
-                    return i >= 0 && int.TryParse(s.name.Substring(i + 1), out int n) ? n : 9999;
-                })
-                .ToArray();
-            return sprites.Length > 0 ? sprites : null;
-#else
-            return null;
-#endif
+            var sprites = RuntimeAssetLoader.LoadSprites(path);
+            return sprites != null && sprites.Length > 0 ? sprites : null;
         }
     }
 }

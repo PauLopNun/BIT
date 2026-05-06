@@ -31,6 +31,9 @@ namespace BIT.Core
         private Image[] _hearts;
         private GameObject _gameOverPanel;
         private Text _gameOverText;
+        private Text _gameOverSubtitleText;
+        private Text _gameOverScoreText;
+        private Text _gameOverReturnText;
         private GameObject _victoryPanel;
         private Text _victoryText;
 
@@ -226,16 +229,30 @@ namespace BIT.Core
             // Corazones (vida)
             CreateHearts(topPanel.transform);
 
-            // Puntuación — abajo a la derecha (sustituye al texto de Nivel)
-            _scoreText = CreateText("ScoreText", _canvas.transform, "Score: 0");
+            // Puntuacion alineada con el combo, justo encima del multiplicador.
+            _scoreText = CreateText("ScoreText", _canvas.transform, "SCORE: 0");
             RectTransform scoreRect = _scoreText.GetComponent<RectTransform>();
             scoreRect.anchorMin = new Vector2(1f, 0f);
             scoreRect.anchorMax = new Vector2(1f, 0f);
             scoreRect.pivot     = new Vector2(1f, 0f);
-            scoreRect.anchoredPosition = new Vector2(-15f, 15f);
-            scoreRect.sizeDelta = new Vector2(220f, 36f);
-            _scoreText.alignment = TextAnchor.MiddleRight;
-            _scoreText.fontSize  = 28;
+            scoreRect.anchoredPosition = new Vector2(-20f, 94f);
+            scoreRect.sizeDelta = new Vector2(320f, 50f);
+            _scoreText.alignment = TextAnchor.MiddleCenter;
+            _scoreText.fontSize  = 38;
+            _scoreText.fontStyle = FontStyle.BoldAndItalic;
+            _scoreText.color     = new Color(0.03f, 0.02f, 0.01f);
+
+            Outline scoreOutline = _scoreText.GetComponent<Outline>();
+            if (scoreOutline != null)
+            {
+                scoreOutline.effectColor = new Color(1f, 0.78f, 0.05f);
+                scoreOutline.effectDistance = new Vector2(3f, -3f);
+            }
+
+            Shadow scoreShadow = _scoreText.gameObject.AddComponent<Shadow>();
+            scoreShadow.effectColor = new Color(1f, 1f, 0.75f, 0.75f);
+            scoreShadow.effectDistance = new Vector2(-2f, 2f);
+
             _scoreTextOriginalScale = _scoreText.transform.localScale;
 
             // Texto de vida (numerico)
@@ -265,16 +282,17 @@ namespace BIT.Core
             // Panel de Victoria (oculto inicialmente)
             CreateVictoryPanel();
 
-            // Texto de ronda (esquina superior izquierda, debajo de corazones)
-            _waveNumText = CreateText("WaveNumText", topPanel.transform, "Ronda 1");
+            // Texto de ronda — centro inferior de la pantalla
+            _waveNumText = CreateText("WaveNumText", _canvas.transform, "Ronda 1");
             RectTransform waveNumRect = _waveNumText.GetComponent<RectTransform>();
-            waveNumRect.anchorMin = new Vector2(0, 0.5f);
-            waveNumRect.anchorMax = new Vector2(0, 0.5f);
-            waveNumRect.pivot = new Vector2(0, 0.5f);
-            waveNumRect.anchoredPosition = new Vector2(20 + (maxHearts * 45) + 130, 0);
-            waveNumRect.sizeDelta = new Vector2(160, 34);
-            _waveNumText.fontSize = 24;
-            _waveNumText.color = new Color(0.9f, 0.9f, 0.4f);
+            waveNumRect.anchorMin = new Vector2(0.5f, 0f);
+            waveNumRect.anchorMax = new Vector2(0.5f, 0f);
+            waveNumRect.pivot     = new Vector2(0.5f, 0f);
+            waveNumRect.anchoredPosition = new Vector2(0f, 14f);
+            waveNumRect.sizeDelta = new Vector2(260f, 36f);
+            _waveNumText.alignment = TextAnchor.MiddleCenter;
+            _waveNumText.fontSize  = 26;
+            _waveNumText.color     = new Color(0.9f, 0.9f, 0.4f);
 
             // Mensaje de oleada (centro de pantalla)
             _waveMessageGO = new GameObject("WaveMessage");
@@ -472,7 +490,7 @@ namespace BIT.Core
         {
             _gameOverPanel = CreatePanel("GameOverPanel", _canvas.transform);
             Image bgImg = _gameOverPanel.GetComponent<Image>();
-            bgImg.color = new Color(0, 0, 0, 0.8f);
+            bgImg.color = new Color(0.025f, 0f, 0.005f, 0.90f);
 
             RectTransform goRect = _gameOverPanel.GetComponent<RectTransform>();
             goRect.anchorMin = Vector2.zero;
@@ -480,17 +498,92 @@ namespace BIT.Core
             goRect.offsetMin = Vector2.zero;
             goRect.offsetMax = Vector2.zero;
 
-            // Texto Game Over
-            _gameOverText = CreateText("GameOverText", _gameOverPanel.transform, "GAME OVER\n\nScore: 0\n\nPress R to Restart");
-            _gameOverText.fontSize = 48;
-            _gameOverText.alignment = TextAnchor.MiddleCenter;
-            _gameOverText.color = Color.white;
+            GameObject content = CreatePanel("GameOverContent", _gameOverPanel.transform);
+            Image contentImg = content.GetComponent<Image>();
+            contentImg.color = new Color(0.08f, 0.01f, 0.018f, 0.92f);
+            Outline contentOutline = content.AddComponent<Outline>();
+            contentOutline.effectColor = new Color(0.70f, 0.02f, 0.02f, 0.80f);
+            contentOutline.effectDistance = new Vector2(4f, -4f);
 
-            RectTransform textRect = _gameOverText.GetComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = Vector2.zero;
-            textRect.offsetMax = Vector2.zero;
+            RectTransform contentRect = content.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0.5f, 0.5f);
+            contentRect.anchorMax = new Vector2(0.5f, 0.5f);
+            contentRect.pivot = new Vector2(0.5f, 0.5f);
+            contentRect.anchoredPosition = Vector2.zero;
+            contentRect.sizeDelta = new Vector2(660f, 380f);
+
+            GameObject accent = new GameObject("GameOverAccent");
+            accent.transform.SetParent(content.transform, false);
+            Image accentImg = accent.AddComponent<Image>();
+            accentImg.color = new Color(0.95f, 0.08f, 0.05f, 1f);
+            RectTransform accentRect = accent.GetComponent<RectTransform>();
+            accentRect.anchorMin = new Vector2(0.5f, 0.5f);
+            accentRect.anchorMax = new Vector2(0.5f, 0.5f);
+            accentRect.pivot = new Vector2(0.5f, 0.5f);
+            accentRect.anchoredPosition = new Vector2(0f, 68f);
+            accentRect.sizeDelta = new Vector2(460f, 4f);
+
+            _gameOverText = CreateText("GameOverTitle", content.transform, "HAS MUERTO");
+            _gameOverText.fontSize = 68;
+            _gameOverText.fontStyle = FontStyle.Bold;
+            _gameOverText.alignment = TextAnchor.MiddleCenter;
+            _gameOverText.color = new Color(1f, 0.12f, 0.08f);
+
+            Outline titleOutline = _gameOverText.GetComponent<Outline>();
+            if (titleOutline != null)
+            {
+                titleOutline.effectColor = new Color(0f, 0f, 0f, 0.95f);
+                titleOutline.effectDistance = new Vector2(4f, -4f);
+            }
+
+            Shadow titleGlow = _gameOverText.gameObject.AddComponent<Shadow>();
+            titleGlow.effectColor = new Color(1f, 0.45f, 0.18f, 0.70f);
+            titleGlow.effectDistance = new Vector2(-3f, 3f);
+
+            RectTransform titleRect = _gameOverText.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            titleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            titleRect.pivot = new Vector2(0.5f, 0.5f);
+            titleRect.anchoredPosition = new Vector2(0f, 122f);
+            titleRect.sizeDelta = new Vector2(620f, 82f);
+
+            _gameOverSubtitleText = CreateText("GameOverSubtitle", content.transform, "Tu aventura termina aquí.");
+            _gameOverSubtitleText.fontSize = 28;
+            _gameOverSubtitleText.fontStyle = FontStyle.Italic;
+            _gameOverSubtitleText.alignment = TextAnchor.MiddleCenter;
+            _gameOverSubtitleText.color = new Color(0.96f, 0.84f, 0.75f);
+
+            RectTransform subtitleRect = _gameOverSubtitleText.GetComponent<RectTransform>();
+            subtitleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            subtitleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            subtitleRect.pivot = new Vector2(0.5f, 0.5f);
+            subtitleRect.anchoredPosition = new Vector2(0f, 28f);
+            subtitleRect.sizeDelta = new Vector2(560f, 40f);
+
+            _gameOverScoreText = CreateText("GameOverScore", content.transform, "Puntuación final: 0");
+            _gameOverScoreText.fontSize = 36;
+            _gameOverScoreText.fontStyle = FontStyle.Bold;
+            _gameOverScoreText.alignment = TextAnchor.MiddleCenter;
+            _gameOverScoreText.color = new Color(1f, 0.82f, 0.22f);
+
+            RectTransform scoreRect = _gameOverScoreText.GetComponent<RectTransform>();
+            scoreRect.anchorMin = new Vector2(0.5f, 0.5f);
+            scoreRect.anchorMax = new Vector2(0.5f, 0.5f);
+            scoreRect.pivot = new Vector2(0.5f, 0.5f);
+            scoreRect.anchoredPosition = new Vector2(0f, -48f);
+            scoreRect.sizeDelta = new Vector2(560f, 50f);
+
+            _gameOverReturnText = CreateText("GameOverReturn", content.transform, "Volviendo al menú principal...");
+            _gameOverReturnText.fontSize = 26;
+            _gameOverReturnText.alignment = TextAnchor.MiddleCenter;
+            _gameOverReturnText.color = new Color(0.86f, 0.86f, 0.86f);
+
+            RectTransform returnRect = _gameOverReturnText.GetComponent<RectTransform>();
+            returnRect.anchorMin = new Vector2(0.5f, 0.5f);
+            returnRect.anchorMax = new Vector2(0.5f, 0.5f);
+            returnRect.pivot = new Vector2(0.5f, 0.5f);
+            returnRect.anchoredPosition = new Vector2(0f, -126f);
+            returnRect.sizeDelta = new Vector2(560f, 42f);
 
             _gameOverPanel.SetActive(false);
         }
@@ -553,7 +646,6 @@ namespace BIT.Core
         {
             yield return null;
 
-#if UNITY_EDITOR
             const string BASE = "Assets/_Project/Sprites/Ninja Adventure/Audio/";
             string[] musicCandidates = {
                 "Musics/17 - Fight.ogg",
@@ -562,29 +654,14 @@ namespace BIT.Core
             };
             foreach (var m in musicCandidates)
             {
-                _backgroundMusic = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + m);
+                _backgroundMusic = RuntimeAssetLoader.LoadAsset<AudioClip>(BASE + m);
                 if (_backgroundMusic != null) break;
             }
-            _hitSound        = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Hit & Impact/Hit1.wav");
-            _coinSound       = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Bonus/Coin.wav");
-            _healSound       = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Magic & Skill/Heal.wav");
-            _attackSound     = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Whoosh & Slash/Slash.wav");
-            _enemyDeathSound = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(BASE + "Sounds/Hit & Impact/Hit2.wav");
-#else
-            // Para builds: copia los audios a Assets/Resources/Ninja Adventure/Audio/
-            string mPath = "Ninja Adventure/Audio/Musics/";
-            foreach (var f in new[] { "17 - Fight", "1 - Adventure Begin", "10 - Dark Castle" })
-            {
-                _backgroundMusic = Resources.Load<AudioClip>(mPath + f);
-                if (_backgroundMusic != null) break;
-            }
-            string sPath = "Ninja Adventure/Audio/Sounds/";
-            _hitSound        = Resources.Load<AudioClip>(sPath + "Hit & Impact/Hit1");
-            _coinSound       = Resources.Load<AudioClip>(sPath + "Bonus/Coin");
-            _healSound       = Resources.Load<AudioClip>(sPath + "Magic & Skill/Heal");
-            _attackSound     = Resources.Load<AudioClip>(sPath + "Whoosh & Slash/Slash");
-            _enemyDeathSound = Resources.Load<AudioClip>(sPath + "Hit & Impact/Hit2");
-#endif
+            _hitSound        = RuntimeAssetLoader.LoadAsset<AudioClip>(BASE + "Sounds/Hit & Impact/Hit1.wav");
+            _coinSound       = RuntimeAssetLoader.LoadAsset<AudioClip>(BASE + "Sounds/Bonus/Coin.wav");
+            _healSound       = RuntimeAssetLoader.LoadAsset<AudioClip>(BASE + "Sounds/Magic & Skill/Heal.wav");
+            _attackSound     = RuntimeAssetLoader.LoadAsset<AudioClip>(BASE + "Sounds/Whoosh & Slash/Slash.wav");
+            _enemyDeathSound = RuntimeAssetLoader.LoadAsset<AudioClip>(BASE + "Sounds/Hit & Impact/Hit2.wav");
 
             if (_backgroundMusic != null)
             {
@@ -636,7 +713,7 @@ namespace BIT.Core
                 _healthText.text = $"{_currentHealth}/{_maxHealth}";
 
             if (_scoreText != null)
-                _scoreText.text = $"Score: {_score}";
+                _scoreText.text = $"SCORE: {_score:N0}";
 
             if (_enemyCountText != null)
             {
@@ -783,7 +860,13 @@ namespace BIT.Core
         {
             _isGameOver = true;
             _gameOverPanel.SetActive(true);
-            _gameOverText.text = $"GAME OVER\n\nScore: {_score}\n\nVolviendo al menú...";
+            _gameOverText.text = "HAS MUERTO";
+            if (_gameOverSubtitleText != null)
+                _gameOverSubtitleText.text = "Tu aventura termina aquí.";
+            if (_gameOverScoreText != null)
+                _gameOverScoreText.text = $"Puntuación final: {_score}";
+            if (_gameOverReturnText != null)
+                _gameOverReturnText.text = "Volviendo al menú principal...";
 
             SaveScoreToRanking();
 
@@ -798,7 +881,7 @@ namespace BIT.Core
         {
             yield return new WaitForSeconds(delay);
             Time.timeScale = 1f;
-            UnityEngine.SceneManagement.SceneManager.LoadScene("CharacterSelect");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
         }
 
         void Victory()
@@ -836,7 +919,7 @@ namespace BIT.Core
         void RestartGame()
         {
             Time.timeScale = 1f;
-            UnityEngine.SceneManagement.SceneManager.LoadScene("CharacterSelect");
+            UnityEngine.SceneManagement.SceneManager.LoadScene(_isGameOver ? "MainMenu" : "CharacterSelect");
         }
 
         // ====================================================================

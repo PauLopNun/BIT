@@ -149,8 +149,8 @@ namespace BIT.UI
             titleTMP.alignment = TextAlignmentOptions.Center;
             titleTMP.color = new Color(1f, 0.85f, 0.3f);
             var titleRT = titleGO.GetComponent<RectTransform>();
-            titleRT.anchorMin = new Vector2(0f, 0.82f);
-            titleRT.anchorMax = new Vector2(1f, 0.98f);
+            titleRT.anchorMin = new Vector2(0f, 0.86f);
+            titleRT.anchorMax = new Vector2(1f, 0.96f);
             titleRT.offsetMin = titleRT.offsetMax = Vector2.zero;
 
             // ── Subtítulo ─────────────────────────────────────────────────
@@ -162,8 +162,8 @@ namespace BIT.UI
             subTMP.alignment = TextAlignmentOptions.Center;
             subTMP.color = new Color(0.7f, 0.7f, 0.7f);
             var subRT = subGO.GetComponent<RectTransform>();
-            subRT.anchorMin = new Vector2(0.1f, 0.76f);
-            subRT.anchorMax = new Vector2(0.9f, 0.84f);
+            subRT.anchorMin = new Vector2(0.1f, 0.79f);
+            subRT.anchorMax = new Vector2(0.9f, 0.85f);
             subRT.offsetMin = subRT.offsetMax = Vector2.zero;
 
             // ── 3 tarjetas de personaje ───────────────────────────────────
@@ -175,17 +175,17 @@ namespace BIT.UI
 
             // ── Botón JUGAR ───────────────────────────────────────────────
             var playGO = BuildButton(canvasGO, "JUGAR", new Color(0.15f, 0.75f, 0.25f),
-                new Vector2(0.35f, 0.06f), new Vector2(0.65f, 0.18f));
+                new Vector2(0.38f, 0.075f), new Vector2(0.62f, 0.16f));
             _playButton = playGO.GetComponent<Button>();
             _playButton.interactable = false;
             _playButton.onClick.AddListener(StartGame);
-            SetButtonTextColor(playGO, Color.white, 36);
+            SetButtonTextColor(playGO, Color.white, 30);
 
             // ── Botón VOLVER ──────────────────────────────────────────────
             var backGO = BuildButton(canvasGO, "← VOLVER", new Color(0.25f, 0.25f, 0.3f),
-                new Vector2(0.02f, 0.02f), new Vector2(0.22f, 0.12f));
+                new Vector2(0.025f, 0.03f), new Vector2(0.18f, 0.105f));
             backGO.GetComponent<Button>().onClick.AddListener(GoBack);
-            SetButtonTextColor(backGO, new Color(0.9f, 0.9f, 0.9f), 24);
+            SetButtonTextColor(backGO, new Color(0.9f, 0.9f, 0.9f), 22);
         }
 
         // ====================================================================
@@ -199,8 +199,8 @@ namespace BIT.UI
             // Fondo de la tarjeta
             var cardGO = MakeImage(parent, $"Card_{index}", new Color(0.12f, 0.10f, 0.18f));
             var cardRT = cardGO.GetComponent<RectTransform>();
-            cardRT.anchorMin = new Vector2(xMin, 0.22f);
-            cardRT.anchorMax = new Vector2(xMax, 0.78f);
+            cardRT.anchorMin = new Vector2(xMin, 0.20f);
+            cardRT.anchorMax = new Vector2(xMax, 0.735f);
             cardRT.offsetMin = cardRT.offsetMax = Vector2.zero;
             _cards.Add(cardGO);
 
@@ -269,7 +269,7 @@ namespace BIT.UI
                 new Vector2(0.05f, 0.46f), new Vector2(0.95f, 0.55f));
 
             // Barras de estadísticas
-            float barY = 0.375f;
+            float barY = 0.39f;
             AddStatBar(innerGO, "HP",   NormalizeHealth(data.maxHealth),   data.spriteColor, ref barY);
             AddStatBar(innerGO, "SPD",  NormalizeSpeed(data.moveSpeed),    data.spriteColor, ref barY);
             AddStatBar(innerGO, "DMG",  NormalizeDamage(data.meleeDamage), data.spriteColor, ref barY);
@@ -277,7 +277,7 @@ namespace BIT.UI
 
             // Botón ELEGIR
             var selGO = BuildButton(innerGO, "ELEGIR", new Color(0.2f, 0.2f, 0.3f),
-                new Vector2(0.05f, 0.01f), new Vector2(0.95f, 0.11f));
+                new Vector2(0.05f, 0.035f), new Vector2(0.95f, 0.105f));
             int capturedIndex = index;
             selGO.GetComponent<Button>().onClick.AddListener(() => SelectCharacter(capturedIndex));
             SetButtonTextColor(selGO, data.spriteColor, 20);
@@ -449,14 +449,7 @@ namespace BIT.UI
         static Sprite TryLoadSprite(string path)
         {
             if (string.IsNullOrEmpty(path)) return null;
-#if UNITY_EDITOR
-            var sprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path);
-            foreach (var a in sprites)
-                if (a is Sprite s) return s;
-            var tex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            if (tex != null) return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-#endif
-            return null;
+            return RuntimeAssetLoader.LoadFirstSprite(path);
         }
     }
 }

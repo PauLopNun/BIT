@@ -58,6 +58,8 @@ namespace BIT.Interactables
         private bool _isBeingPushed = false;
         private AudioSource _audioSource;
 
+        public bool IsBeingPushed => _isBeingPushed;
+
         // ====================================================================
         // SECCIÓN 3: INICIALIZACIÓN
         // ====================================================================
